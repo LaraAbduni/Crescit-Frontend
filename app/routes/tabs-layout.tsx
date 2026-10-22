@@ -1,4 +1,6 @@
 import { Navigate, NavLink, Outlet } from "react-router";
+import { useAuth0 } from "@auth0/auth0-react";
+import { useState } from "react";
 import { useOnboarding } from "~/lib/onboarding";
 
 const TABS = [
@@ -9,14 +11,24 @@ const TABS = [
 
 /** Telas principais do app (depois do onboarding), com a navegação inferior. */
 export default function TabsLayout() {
-  const { profile, ready } = useOnboarding();
+  const { account, profile, ready, clearDraft, retry } = useOnboarding();
+  const { logout } = useAuth0();
+  const [logoutError, setLogoutError] = useState(false);
 
   if (!ready) return null;
-  if (!profile) return <Navigate to="/" replace />;
+  if (!profile) return <Navigate to="/cadastro/contexto" replace />;
 
   return (
     <>
       <div className="mx-auto w-full max-w-md px-6 pt-12 pb-32">
+        <div className="mb-6 flex items-center justify-between gap-4 text-sm text-muted">
+          <span className="truncate">{account?.email || account?.name}</span>
+          <button type="button" className="shrink-0 font-semibold text-brand hover:underline" onClick={() => {
+            clearDraft();
+            void logout({ logoutParams: { returnTo: window.location.origin } }).catch(() => { setLogoutError(true); retry(); });
+          }}>Sair</button>
+        </div>
+        {logoutError && <p role="alert" className="mb-4 text-aggressive">Não foi possível sair. Tente novamente.</p>}
         <Outlet />
       </div>
       <nav className="fixed inset-x-0 bottom-0 border-t border-line bg-white">

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Chip, PrimaryButton, TextField } from "~/components/ui";
 import { money, parseDecimal, todayISO } from "~/lib/format";
+import { apiErrorMessage } from "~/lib/api";
 import type { ContributionRequest, InvestmentRequest } from "~/lib/portfolio";
 import { ASSET_TYPE_LABEL, getAssets, type Asset, type AssetType } from "~/lib/recommendations";
 
@@ -110,8 +111,8 @@ export function ContributionForm({
     setError(undefined);
     try {
       await onSubmit(toRequest(values));
-    } catch {
-      setError("Não foi possível registrar o aporte. Tente de novo.");
+    } catch (e) {
+      setError(apiErrorMessage(e, "Não foi possível registrar o aporte. Tente de novo."));
       setSaving(false);
     }
   }
@@ -183,8 +184,8 @@ export function InvestmentForm({
     setError(undefined);
     try {
       await onSubmit({ ticker, assetName: assetName.trim(), assetType: assetType! }, toRequest(values));
-    } catch {
-      setError("Não foi possível adicionar o investimento. Tente de novo.");
+    } catch (e) {
+      setError(apiErrorMessage(e, "Não foi possível adicionar o investimento. Tente de novo."));
       setSaving(false);
     }
   }

@@ -1,4 +1,4 @@
-import { ApiError, isMockPortfolioApi, portfolioApi } from "./api";
+import { ApiError, portfolioApi } from "./api";
 import { getAssets, type AssetType } from "./recommendations";
 
 /** InvestmentRequest do Serviço de Portfólio. */
@@ -44,7 +44,6 @@ export interface Contribution {
 const base = (userId: string) => `/portfolios/${encodeURIComponent(userId)}`;
 
 export async function listInvestments(userId: string): Promise<Investment[]> {
-  if (isMockPortfolioApi) return mockStore.read().investments;
   try {
     return await portfolioApi<Investment[]>("GET", `${base(userId)}/investments`);
   } catch (e) {
@@ -55,7 +54,6 @@ export async function listInvestments(userId: string): Promise<Investment[]> {
 }
 
 export async function listContributions(userId: string, investmentId: string): Promise<Contribution[]> {
-  if (isMockPortfolioApi) return mockStore.contributionsOf(investmentId);
   return portfolioApi("GET", `${base(userId)}/investments/${investmentId}/contributions`);
 }
 
@@ -64,7 +62,6 @@ export async function listContributions(userId: string, investmentId: string): P
  * registrados depois. Se o ticker já estiver na carteira, devolve o existente.
  */
 export async function addInvestment(userId: string, req: InvestmentRequest): Promise<Investment> {
-  if (isMockPortfolioApi) return mockStore.addInvestment(req);
   try {
     return await portfolioApi("POST", `${base(userId)}/investments`, req);
   } catch (e) {
@@ -81,7 +78,6 @@ export async function addContribution(
   investmentId: string,
   req: ContributionRequest,
 ): Promise<Contribution> {
-  if (isMockPortfolioApi) return mockStore.addContribution(investmentId, req);
   return portfolioApi("POST", `${base(userId)}/investments/${investmentId}/contributions`, req);
 }
 
@@ -98,6 +94,7 @@ export interface Holding extends Investment {
 }
 
 export interface PortfolioSummary {
+  hasMissingPrices: boolean;
   holdings: Holding[];
   totalInvested: number;
   currentValue: number;
@@ -150,11 +147,12 @@ export async function loadPortfolio(userId: string): Promise<PortfolioSummary> {
     .sort((a, b) => b.contributionDate.localeCompare(a.contributionDate) || b.createdAt.localeCompare(a.createdAt));
 
   return {
+    hasMissingPrices: holdings.some((h) => h.currentPrice === undefined),
     holdings,
     totalInvested,
     currentValue,
     gain,
-    gainPct: totalInvested > 0 ? gain / totalInvested : null,
+    gainPct: totalInvested > 0 && holdings.every((h) => h.currentPrice !== undefined) ? gain / totalInvested : null,
     allocation,
     recentContributions,
   };
@@ -168,87 +166,3 @@ export function unitLabel(type: AssetType, quantity: number) {
   if (type === "FIXED_INCOME") return one ? "título" : "títulos";
   return one ? "cota" : "cotas";
 }
-
-// --- Modo demonstração: carteira guardada no sessionStorage --------------
-// Recalcula os totais como o ContributionService do backend.
-
-interface MockData {
-  investments: Investment[];
-  contributions: Contribution[];
-}
-
-const MOCK_KEY = "crescit:mock-portfolio";
-
-const mockStore = {
-  read(): MockData {
-    try {
-      const raw = sessionStorage.getItem(MOCK_KEY);
-      if (raw) return JSON.parse(raw);
-    } catch {
-      // segue com a carteira vazia
-    }
-    return { investments: [], contributions: [] };
-  },
-  write(data: MockData) {
-    try {
-      sessionStorage.setItem(MOCK_KEY, JSON.stringify(data));
-    } catch {
-      // idem
-    }
-  },
-  contributionsOf(investmentId: string) {
-    return this.read()
-      .contributions.filter((c) => c.investmentId === investmentId)
-      .sort((a, b) => b.contributionDate.localeCompare(a.contributionDate) || b.createdAt.localeCompare(a.createdAt));
-  },
-  addInvestment(req: InvestmentRequest): Investment {
-    const data = this.read();
-    const ticker = req.ticker.trim().toUpperCase();
-    const existing = data.investments.find((i) => i.ticker === ticker);
-    if (existing) return existing;
-    const now = new Date().toISOString();
-    const investment: Investment = {
-      id: crypto.randomUUID(),
-      portfolioId: "demo",
-      ticker,
-      assetName: req.assetName.trim(),
-      assetType: req.assetType,
-      totalQuantity: 0,
-      totalInvested: 0,
-      averagePrice: 0,
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.write({ ...data, investments: [...data.investments, investment] });
-    return investment;
-  },
-  addContribution(investmentId: string, req: ContributionRequest): Contribution {
-    const data = this.read();
-    const contribution: Contribution = {
-      id: crypto.randomUUID(),
-      investmentId,
-      quantity: req.quantity,
-      unitPrice: req.unitPrice,
-      amount: Math.round(req.quantity * req.unitPrice * 100) / 100,
-      contributionDate: req.contributionDate,
-      createdAt: new Date().toISOString(),
-    };
-    const contributions = [...data.contributions, contribution];
-    const own = contributions.filter((c) => c.investmentId === investmentId);
-    const totalQuantity = sum(own.map((c) => c.quantity));
-    const totalInvested = Math.round(sum(own.map((c) => c.amount)) * 100) / 100;
-    const investments = data.investments.map((i) =>
-      i.id === investmentId
-        ? {
-            ...i,
-            totalQuantity,
-            totalInvested,
-            averagePrice: totalQuantity ? totalInvested / totalQuantity : 0,
-            updatedAt: new Date().toISOString(),
-          }
-        : i,
-    );
-    this.write({ investments, contributions });
-    return contribution;
-  },
-};

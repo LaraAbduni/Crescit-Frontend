@@ -1,6 +1,8 @@
-import { useNavigate } from "react-router";
+import { Navigate, useNavigate } from "react-router";
+import { useAuth0 } from "@auth0/auth0-react";
 import type { Route } from "./+types/welcome";
-import { Logo, PrimaryButton, Screen } from "~/components/ui";
+import { Logo, PrimaryButton, Screen, TextButton } from "~/components/ui";
+import { QUESTIONS } from "~/lib/profile";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -10,18 +12,23 @@ export function meta({}: Route.MetaArgs) {
 }
 
 const HIGHLIGHTS = [
-  { title: "Descubra seu perfil", text: "5 perguntas rápidas sobre seus objetivos e sua experiência." },
+  { title: "Descubra seu perfil", text: `${QUESTIONS.length} perguntas rápidas sobre seus objetivos e sua experiência.` },
   { title: "Receba recomendações", text: "Ativos compatíveis com o seu perfil de investidor." },
   { title: "Acompanhe sua carteira", text: "Seus aportes e a evolução do patrimônio em um só lugar." },
 ];
 
 export default function Welcome() {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth0();
+  if (isAuthenticated) return <Navigate to="/inicio" replace />;
 
   return (
     <Screen
       header={<Logo />}
-      footer={<PrimaryButton onClick={() => navigate("/cadastro")}>Criar minha conta</PrimaryButton>}
+      footer={<>
+        <PrimaryButton onClick={() => navigate("/cadastro")}>Criar minha conta</PrimaryButton>
+        <TextButton onClick={() => navigate("/cadastro?entrar=1")}>Já tenho conta</TextButton>
+      </>}
     >
       <div className="mt-12">
         <h1 className="font-serif text-[2.6rem] leading-[1.1] font-bold text-ink">
