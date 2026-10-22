@@ -197,13 +197,17 @@ export function TextField({
 
 export function Logo({ className = "" }: { className?: string }) {
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
-      <svg width="32" height="32" viewBox="0 0 32 32" aria-hidden>
-        <rect width="32" height="32" rx="9" fill="var(--color-brand)" />
-        <path d="M9 21l5-5 3.5 3.5L24 13" stroke="white" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M19 13h5v5" stroke="white" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      <span className="font-serif text-2xl font-bold text-ink">Crescit</span>
-    </div>
+    <span role="img" aria-label="Crescit" className={`inline-block font-serif text-[1.75rem] leading-none font-bold tracking-tight text-brand ${className}`}>
+      <span aria-hidden>
+        cresc
+        <span className="relative inline-block">
+          ı
+          <svg viewBox="0 0 10 9" className="absolute bottom-[0.76em] left-[60%] h-[0.3em] w-[0.34em] -translate-x-1/2">
+            <path d="M5 1 9 8H1Z" fill="var(--color-accent)" stroke="var(--color-accent)" strokeWidth="1.5" strokeLinejoin="round" />
+          </svg>
+        </span>
+        t
+      </span>
+    </span>
   );
 }
