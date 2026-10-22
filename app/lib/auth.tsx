@@ -1,5 +1,5 @@
 import { Auth0Provider, useAuth0 } from "@auth0/auth0-react";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { Logo, PrimaryButton, Screen, Title } from "~/components/ui";
 import { SESSION_EXPIRED_EVENT, setAccessTokenGetter } from "./api";
@@ -38,7 +38,9 @@ function AuthSession({ children }: { children: React.ReactNode }) {
   const [connected, setConnected] = useState(false);
   const [expired, setExpired] = useState(false);
   const [loginError, setLoginError] = useState(false);
-  useEffect(() => {
+  // Os efeitos dos filhos buscam o perfil ao concluir o login. O token precisa
+  // estar disponível antes desses efeitos, inclusive no retorno do Auth0.
+  useLayoutEffect(() => {
     setAccessTokenGetter(isAuthenticated ? () => getAccessTokenSilently() : undefined);
     setConnected(true);
     return () => setAccessTokenGetter(undefined);
@@ -62,6 +64,7 @@ function AuthSession({ children }: { children: React.ReactNode }) {
         <p role="alert" className="mt-4 text-muted">
           {expired ? "Sua sessão expirou. Entre para continuar de onde parou." : "Não foi possível concluir o login. Tente novamente."}
         </p>
+        {import.meta.env.DEV && error && <p className="mt-3 break-words text-sm text-muted">Detalhe do login: {error.message}</p>}
         {loginError && <p role="alert" className="mt-4 text-aggressive">Não foi possível abrir o login. Tente novamente.</p>}
       </Screen>
     );

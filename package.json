@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "diagnose:auth": "node dev/diagnose-auth0.mjs",
     "test": "vitest run",
     "build": "react-router build",
     "dev": "react-router dev",
