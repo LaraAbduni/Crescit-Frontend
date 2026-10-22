@@ -1,94 +1,62 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router";
+import { useAuth0 } from "@auth0/auth0-react";
+import { useState } from "react";
+import { Navigate, useNavigate, useSearchParams } from "react-router";
 import type { Route } from "./+types/signup";
-import { Eyebrow, PrimaryButton, Screen, StepHeader, TextField, Title } from "~/components/ui";
+import { Eyebrow, PrimaryButton, Screen, StepHeader, TextButton, Title } from "~/components/ui";
+import { safeReturnTo } from "~/lib/auth";
 import { useOnboarding } from "~/lib/onboarding";
 
 export function meta({}: Route.MetaArgs) {
-  return [{ title: "Criar conta · Crescit" }];
-}
-
-interface Errors {
-  name?: string;
-  email?: string;
-  password?: string;
-}
-
-function validate(name: string, email: string, password: string): Errors {
-  const errors: Errors = {};
-  if (name.trim().split(/\s+/).length < 2) errors.name = "Informe nome e sobrenome";
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = "E-mail inválido";
-  if (password.length < 8) errors.password = "A senha precisa ter pelo menos 8 caracteres";
-  return errors;
+  return [{ title: "Sua conta · Crescit" }];
 }
 
 export default function Signup() {
   const navigate = useNavigate();
-  const { account, ready, setAccount } = useOnboarding();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [submitted, setSubmitted] = useState(false);
+  const [params] = useSearchParams();
+  const { isAuthenticated, loginWithRedirect } = useAuth0();
+  const { ready, profile } = useOnboarding();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
+  const login = params.get("entrar") === "1";
+  if (isAuthenticated) {
+    // A rota protegida cuida do carregamento e de eventuais erros da API.
+    return <Navigate to={ready && !profile ? "/cadastro/contexto" : safeReturnTo(params.get("returnTo"))} replace />;
+  }
 
-  // Preenche de novo quando o usuário volta para esta etapa
-  useEffect(() => {
-    if (ready && account) {
-      setName(account.name);
-      setEmail(account.email);
+  async function enter(signup: boolean) {
+    setBusy(true);
+    setError(false);
+    try {
+      await loginWithRedirect({
+        appState: { returnTo: safeReturnTo(params.get("returnTo")) },
+        authorizationParams: signup ? { screen_hint: "signup" } : {},
+      });
+    } catch {
+      setError(true);
+      setBusy(false);
     }
-  }, [ready]);
-
-  const errors = submitted ? validate(name, email, password) : {};
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSubmitted(true);
-    if (Object.keys(validate(name, email, password)).length > 0) return;
-    // TODO: criar o usuário no Auth0. A senha não é guardada no front.
-    setAccount({ name: name.trim(), email: email.trim() });
-    navigate("/cadastro/contexto");
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate>
-      <Screen
-        header={<StepHeader label="Cadastro · 1 de 2" progress={0.5} onBack={() => navigate("/")} />}
-        footer={<PrimaryButton type="submit">Continuar</PrimaryButton>}
-      >
-        <Eyebrow>Sua conta</Eyebrow>
-        <Title>Vamos começar pelo básico</Title>
-        <p className="mt-3 text-muted">Depois, algumas perguntas para conhecer você como investidor.</p>
-
-        <div className="mt-8 flex flex-col gap-5">
-          <TextField
-            label="Nome completo"
-            autoComplete="name"
-            placeholder="Marina Souza"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            error={errors.name}
-          />
-          <TextField
-            label="E-mail"
-            type="email"
-            autoComplete="email"
-            inputMode="email"
-            placeholder="voce@email.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            error={errors.email}
-          />
-          <TextField
-            label="Senha"
-            type="password"
-            autoComplete="new-password"
-            placeholder="Mínimo de 8 caracteres"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            error={errors.password}
-          />
-        </div>
-      </Screen>
-    </form>
+    <Screen
+      header={<StepHeader label="Cadastro · 1 de 2" progress={0.5} onBack={() => navigate("/")} />}
+      footer={<>
+        {error && <p role="alert" className="text-center text-aggressive">Não foi possível abrir o login. Tente novamente.</p>}
+        <PrimaryButton onClick={() => enter(!login)} disabled={busy}>
+          {busy ? "Abrindo acesso seguro..." : login ? "Entrar na minha conta" : "Criar minha conta"}
+        </PrimaryButton>
+        <TextButton onClick={() => enter(login)} disabled={busy}>
+          {login ? "Ainda não tenho conta" : "Já tenho conta"}
+        </TextButton>
+      </>}
+    >
+      <Eyebrow>Sua conta</Eyebrow>
+      <Title>{login ? "Que bom ter você de volta" : "Vamos começar pelo básico"}</Title>
+      <p className="mt-3 text-muted">Continue para acessar sua conta com segurança. Depois, algumas perguntas para conhecer você como investidor.</p>
+      <div className="mt-8 rounded-2xl border border-line bg-white p-5">
+        <h2 className="text-lg font-semibold text-ink">Um acesso para tudo</h2>
+        <p className="mt-2 text-muted">Seu perfil, suas recomendações e sua carteira ficam vinculados à sua conta.</p>
+      </div>
+    </Screen>
   );
 }

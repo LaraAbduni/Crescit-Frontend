@@ -9,6 +9,7 @@ import { unitLabel } from "~/lib/portfolio";
 import { INVESTOR_TYPES, type InvestorType } from "~/lib/profile";
 import { ASSET_TYPE_LABEL, getRecommendations, RISK_LABEL, type Recommendation } from "~/lib/recommendations";
 import { usePortfolio } from "~/lib/use-portfolio";
+import { apiErrorMessage } from "~/lib/api";
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "Início · Crescit" }];
@@ -30,12 +31,17 @@ export default function Home() {
   const { userId, investorType } = profile!;
   const { load, retry } = usePortfolio(userId);
   const [recommended, setRecommended] = useState<Recommendation[] | null>(null);
+  const [recommendationsError, setRecommendationsError] = useState<string>();
+  const [recommendationsAttempt, setRecommendationsAttempt] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
+    setRecommendationsError(undefined);
     getRecommendations(userId, investorType)
-      .then((list) => setRecommended(list.slice(0, 2)))
-      .catch(() => setRecommended([]));
-  }, [userId, investorType]);
+      .then((list) => { if (!cancelled) setRecommended(list.slice(0, 2)); })
+      .catch((e) => { if (!cancelled) setRecommendationsError(apiErrorMessage(e, "Não foi possível carregar suas recomendações.")); });
+    return () => { cancelled = true; };
+  }, [userId, investorType, recommendationsAttempt]);
 
   const pill = PROFILE_PILL[investorType];
   const firstName = account?.name.split(" ")[0];
@@ -62,7 +68,7 @@ export default function Home() {
         {load.status === "loading" && <div className="mt-2 h-12 w-56 animate-pulse rounded-lg bg-white/15" />}
         {load.status === "error" && (
           <p className="mt-2">
-            Não foi possível carregar.{" "}
+            {load.message}{" "}
             <button type="button" onClick={retry} className="font-semibold underline">
               Tentar de novo
             </button>
@@ -119,6 +125,8 @@ export default function Home() {
           </ul>
         </Card>
       )}
+
+      {recommendationsError && <Card title="Recomendados para você"><p role="alert" className="mt-2 text-muted">{recommendationsError}</p><button type="button" className="mt-3 font-semibold text-brand underline" onClick={() => setRecommendationsAttempt((n) => n + 1)}>Tentar novamente</button></Card>}
 
       {summary && summary.recentContributions.length > 0 && (
         <Card title="Últimos aportes">

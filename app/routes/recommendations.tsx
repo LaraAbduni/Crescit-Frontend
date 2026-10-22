@@ -4,6 +4,7 @@ import { PROFILE_TEXT_COLOR } from "~/components/profile-gauge";
 import { RecommendationCard, type AddState } from "~/components/recommendation-card";
 import { Chip, PageTitle } from "~/components/ui";
 import { useOnboarding } from "~/lib/onboarding";
+import { apiErrorMessage } from "~/lib/api";
 import { addInvestment, listInvestments } from "~/lib/portfolio";
 import { INVESTOR_TYPES } from "~/lib/profile";
 import {
@@ -22,7 +23,7 @@ const FILTERS: (AssetType | "ALL")[] = ["ALL", "STOCK", "FII", "ETF", "FIXED_INC
 
 type Load =
   | { status: "loading" }
-  | { status: "error" }
+  | { status: "error"; message: string }
   | { status: "done"; items: Recommendation[] };
 
 export default function Recommendations() {
@@ -48,7 +49,7 @@ export default function Recommendations() {
     setLoad({ status: "loading" });
     getRecommendations(userId, investorType)
       .then((items) => !cancelled && setLoad({ status: "done", items }))
-      .catch(() => !cancelled && setLoad({ status: "error" }));
+      .catch((e) => !cancelled && setLoad({ status: "error", message: apiErrorMessage(e, "Não foi possível carregar suas recomendações.") }));
     return () => {
       cancelled = true;
     };
@@ -77,6 +78,8 @@ export default function Recommendations() {
         · {RISK_SCOPE[investorType]}
       </p>
 
+      <p className="mt-2 text-sm text-muted">Preços de referência do catálogo; não são cotações em tempo real.</p>
+
       <div className="-mx-6 mt-5 flex gap-2 overflow-x-auto px-6 pb-1 [scrollbar-width:none]" aria-label="Filtrar por tipo de ativo">
         {FILTERS.map((f) => (
           <Chip key={f} selected={filter === f} onClick={() => setFilter(f)}>
@@ -90,7 +93,7 @@ export default function Recommendations() {
 
         {load.status === "error" && (
           <div className="rounded-3xl border border-line bg-white p-6 text-center">
-            <p className="text-lg text-ink">Não foi possível carregar suas recomendações.</p>
+            <p className="text-lg text-ink">{load.message}</p>
             <button
               type="button"
               onClick={() => setAttempt((n) => n + 1)}

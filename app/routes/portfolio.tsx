@@ -42,7 +42,7 @@ export default function Portfolio() {
 
       {load.status === "error" && (
         <div className="mt-6 rounded-3xl border border-line bg-white p-6 text-center">
-          <p className="text-lg text-ink">Não foi possível carregar sua carteira.</p>
+          <p className="text-lg text-ink">{load.message}</p>
           <button type="button" onClick={retry} className="mt-4 h-12 rounded-xl border-2 border-brand px-5 text-lg font-semibold text-brand hover:bg-brand-soft">
             Tentar de novo
           </button>
@@ -51,6 +51,7 @@ export default function Portfolio() {
 
       {load.status === "done" && (
         <>
+          {load.refreshError && <p role="alert" className="mt-4 text-aggressive">{load.refreshError} <button type="button" className="underline" onClick={retry}>Atualizar</button></p>}
           <section className="mt-6 rounded-3xl border border-line bg-white p-6">
             <p className="text-muted">Valor atual</p>
             <p className="mt-1 font-serif text-[2.6rem] leading-tight font-bold text-ink">{money(load.summary.currentValue)}</p>
@@ -59,6 +60,8 @@ export default function Portfolio() {
               <span className="text-muted">Investido {money(load.summary.totalInvested)}</span>
             </p>
           </section>
+          <p className="mt-3 text-sm text-muted">Os valores usam os preços cadastrados no catálogo, sem cotação em tempo real.</p>
+          {load.summary.hasMissingPrices && <p role="status" className="mt-2 text-sm text-muted">Alguns ativos estão sem preço disponível. Para eles, mostramos o valor investido.</p>}
 
           {load.summary.holdings.length === 0 ? (
             <div className="mt-5 rounded-3xl border border-line bg-white p-6 text-center">

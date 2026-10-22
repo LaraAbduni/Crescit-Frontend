@@ -33,7 +33,7 @@ const MONTHLY_AMOUNTS = [
 
 export default function SignupContext() {
   const navigate = useNavigate();
-  const { account, context, ready, setContext } = useOnboarding();
+  const { account, context, profile, ready, setContext } = useOnboarding();
   const [banks, setBanks] = useState<string[]>([]);
   const [monthlyAmount, setMonthlyAmount] = useState<string>();
 
@@ -45,6 +45,7 @@ export default function SignupContext() {
   }, [ready]);
 
   if (ready && !account) return <Navigate to="/cadastro" replace />;
+  if (ready && profile) return <Navigate to="/inicio" replace />;
 
   function toggleBank(bank: string) {
     setBanks((current) => {
@@ -73,6 +74,7 @@ export default function SignupContext() {
       <Eyebrow>Seu contexto</Eyebrow>
       <Title>{firstName ? `${firstName}, onde você tem conta hoje?` : "Onde você tem conta hoje?"}</Title>
       <p className="mt-3 text-muted">Bancos e corretoras. Pode marcar mais de um.</p>
+      <p className="mt-2 text-sm text-muted">Essas preferências ficam apenas nesta sessão.</p>
 
       <div className="mt-6 flex flex-wrap gap-2">
         {BANKS.map((bank) => (

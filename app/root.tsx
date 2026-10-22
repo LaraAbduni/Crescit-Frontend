@@ -9,6 +9,7 @@ import {
 
 import type { Route } from "./+types/root";
 import { OnboardingProvider } from "./lib/onboarding";
+import { AuthProvider } from "./lib/auth";
 import "./app.css";
 
 export const links: Route.LinksFunction = () => [
@@ -45,9 +46,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <OnboardingProvider>
-      <Outlet />
-    </OnboardingProvider>
+    <AuthProvider>
+      <OnboardingProvider>
+        <Outlet />
+      </OnboardingProvider>
+    </AuthProvider>
   );
 }
 

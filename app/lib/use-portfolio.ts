@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { loadPortfolio, type PortfolioSummary } from "./portfolio";
+import { apiErrorMessage } from "./api";
 
 export type PortfolioLoad =
   | { status: "loading" }
-  | { status: "error" }
-  | { status: "done"; summary: PortfolioSummary };
+  | { status: "error"; message: string }
+  | { status: "done"; summary: PortfolioSummary; refreshError?: string };
 
 /** Carrega o resumo da carteira; `reload` recarrega sem esconder os dados atuais. */
 export function usePortfolio(userId: string) {
@@ -13,18 +14,19 @@ export function usePortfolio(userId: string) {
   const reload = useCallback(async () => {
     try {
       setLoad({ status: "done", summary: await loadPortfolio(userId) });
-    } catch {
-      setLoad((current) => (current.status === "done" ? current : { status: "error" }));
+    } catch (e) {
+      const message = apiErrorMessage(e, "Não foi possível carregar sua carteira.");
+      setLoad((current) => current.status === "done" ? { ...current, refreshError: message } : { status: "error", message });
     }
   }, [userId]);
 
   const retry = useCallback(() => {
     setLoad({ status: "loading" });
-    reload();
+    void reload();
   }, [reload]);
 
   useEffect(() => {
-    reload();
+    void reload();
   }, [reload]);
 
   return { load, reload, retry };
