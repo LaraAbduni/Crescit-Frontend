@@ -7,3 +7,7 @@
 # React Router
 /.react-router/
 /build/
+.vercel
+.env*
+!.env.example
+!.env.production

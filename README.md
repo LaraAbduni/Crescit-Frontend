@@ -2,6 +2,25 @@
 
 React Router, React 19 e Tailwind, com o padrão visual original do Crescit. As telas usam as APIs de Perfil, Recomendações e Portfólio com access tokens do Auth0.
 
+## APIs em producao
+
+O servidor atual e `100.53.222.83`. As tres APIs usam o proxy HTTPS na porta
+8081, que ja estava liberada na EC2:
+
+```env
+VITE_PROFILE_API_URL=https://perfil.100-53-222-83.sslip.io:8081
+VITE_RECOMMENDATIONS_API_URL=https://recomendacoes.100-53-222-83.sslip.io:8081
+VITE_PORTFOLIO_API_URL=https://portfolio.100-53-222-83.sslip.io:8081
+```
+
+Esses valores devem estar no ambiente Production da Vercel; alteracoes exigem
+um novo deploy. `.env.production` contem os mesmos valores publicos para builds
+de producao locais. O desenvolvimento local continua usando `.env`.
+
+Os enderecos temporarios usam sslip.io e dependem do IP atual da instancia.
+O Caddy renova os certificados automaticamente pela porta 80. Se o IP mudar,
+atualize os hosts do proxy e as variaveis da Vercel.
+
 ## Estado da configuração Auth0
 
 Em 22/10/2026, a API foi substituída pela audience `https://api.crescit-investimentos`. O frontend e os três serviços locais já usam essa nova audience. Foi corrigida uma falha de sincronização que mostrava sessão expirada antes de obter o token. Após configurar o RBAC e os vínculos de permissões da API nova no Auth0, o usuário confirmou que conseguiu entrar e abrir o app sem o bloqueio de acesso ao perfil. O percurso completo de salvar o questionário, consultar recomendações e registrar investimentos e aportes ainda precisa ser validado com essa conta no navegador.
