@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router";
 import type { Route } from "./+types/questionnaire";
 import { Eyebrow, OptionCard, PrimaryButton, Screen, StepHeader, Title } from "~/components/ui";
@@ -17,8 +17,6 @@ export default function Questionnaire() {
   const { account, answers, profile, ready, setAnswers, setProfile } = useOnboarding();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>();
-
-  if (ready && !account) return <Navigate to="/cadastro" replace />;
 
   const total = QUESTIONS.length;
   const step = Math.min(Math.max(Number(params.get("pergunta")) || 1, 1), total);
@@ -69,6 +67,29 @@ export default function Questionnaire() {
     }
   }
 
+  // Atalhos no computador: 1–9 escolhem a opção e Enter avança
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.altKey || e.ctrlKey || e.metaKey || submitting) return;
+      const n = Number(e.key);
+      if (n >= 1 && n <= question.options.length) {
+        e.preventDefault();
+        handleSelect(question.options[n - 1]);
+      } else if (e.key === "Enter" && isAnswered(question, answers)) {
+        // Com o foco em Voltar ou Continuar, o Enter aciona o próprio botão;
+        // com o foco numa opção, avança em vez de desmarcá-la
+        const target = e.target as HTMLElement;
+        if (target.tagName === "BUTTON" && !["radio", "checkbox"].includes(target.getAttribute("role") ?? "")) return;
+        e.preventDefault();
+        void handleContinue();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  if (ready && !account) return <Navigate to="/cadastro" replace />;
+
   return (
     <Screen
       header={<StepHeader label={`Pergunta ${step} de ${total}`} progress={step / total} onBack={handleBack} />}
@@ -88,6 +109,9 @@ export default function Questionnaire() {
       <Eyebrow>{question.eyebrow}</Eyebrow>
       <Title>{question.title}</Title>
       {question.hint && <p className="mt-3 text-muted">{question.hint}</p>}
+      <p className="mt-3 hidden text-sm text-muted md:block">
+        Dica: use as teclas 1 a {question.options.length} para escolher e Enter para continuar.
+      </p>
 
       <div
         key={question.id}
@@ -95,9 +119,10 @@ export default function Questionnaire() {
         role={question.multiple ? "group" : "radiogroup"}
         aria-label={question.title}
       >
-        {question.options.map((option) => (
+        {question.options.map((option, i) => (
           <OptionCard
             key={option.value}
+            shortcut={question.options.length <= 9 ? i + 1 : undefined}
             label={option.label}
             description={option.description}
             multiple={question.multiple}

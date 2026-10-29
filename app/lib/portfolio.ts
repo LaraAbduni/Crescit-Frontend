@@ -81,6 +81,16 @@ export async function addContribution(
   return portfolioApi("POST", `${base(userId)}/investments/${investmentId}/contributions`, req);
 }
 
+/** Remove o ativo e todos os aportes dele. */
+export async function deleteInvestment(userId: string, investmentId: string): Promise<void> {
+  return portfolioApi("DELETE", `${base(userId)}/investments/${investmentId}`);
+}
+
+/** Remove um aporte; o serviço recalcula quantidade, total investido e preço médio. */
+export async function deleteContribution(userId: string, investmentId: string, contributionId: string): Promise<void> {
+  return portfolioApi("DELETE", `${base(userId)}/investments/${investmentId}/contributions/${contributionId}`);
+}
+
 // --- Resumo da carteira (usado pela Carteira e pelo Início) --------------
 
 export interface Holding extends Investment {

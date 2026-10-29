@@ -85,6 +85,51 @@ function SubmitError({ message }: { message?: string }) {
   );
 }
 
+/** Confirmação de uma remoção (ativo ou aporte), com o erro da API no próprio painel. */
+export function ConfirmRemoval({
+  message,
+  confirmLabel,
+  onConfirm,
+  onCancel,
+}: {
+  message: React.ReactNode;
+  confirmLabel: string;
+  onConfirm: () => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [removing, setRemoving] = useState(false);
+  const [error, setError] = useState<string>();
+
+  async function handleConfirm() {
+    setRemoving(true);
+    setError(undefined);
+    try {
+      await onConfirm();
+    } catch (e) {
+      setError(apiErrorMessage(e, "Não foi possível remover. Tente de novo."));
+      setRemoving(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      <p className="text-lg text-ink/80">{message}</p>
+      <SubmitError message={error} />
+      <button
+        type="button"
+        onClick={handleConfirm}
+        disabled={removing}
+        className="h-14 w-full rounded-2xl bg-[#b4472f] text-lg font-semibold text-white transition hover:bg-[#963a26] disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        {removing ? "Removendo..." : confirmLabel}
+      </button>
+      <button type="button" onClick={onCancel} className="h-10 text-lg font-semibold text-brand hover:underline">
+        Cancelar
+      </button>
+    </div>
+  );
+}
+
 /** Novo aporte em um investimento que já está na carteira. */
 export function ContributionForm({
   suggestedPrice,

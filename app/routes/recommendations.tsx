@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router";
 import type { Route } from "./+types/recommendations";
 import { PROFILE_TEXT_COLOR } from "~/components/profile-gauge";
 import { RecommendationCard, type AddState } from "~/components/recommendation-card";
+import { useToast } from "~/components/toast";
 import { Chip, PageTitle } from "~/components/ui";
 import { useOnboarding } from "~/lib/onboarding";
 import { apiErrorMessage } from "~/lib/api";
@@ -36,6 +38,10 @@ export default function Recommendations() {
   const [filter, setFilter] = useState<AssetType | "ALL">("ALL");
   const [adding, setAdding] = useState<Record<string, AddState>>({});
   const [ownedTickers, setOwnedTickers] = useState<string[]>([]);
+  const toast = useToast();
+  // Vindo do Início (?ativo=PETR4), o card do ativo é rolado até a tela e destacado
+  const [params] = useSearchParams();
+  const focused = params.get("ativo");
 
   // Ativos que já estão na carteira aparecem como "Na carteira"
   useEffect(() => {
@@ -55,12 +61,18 @@ export default function Recommendations() {
     };
   }, [userId, investorType, attempt]);
 
+  useEffect(() => {
+    if (load.status !== "done" || !focused) return;
+    document.getElementById(`ativo-${focused}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [load.status, focused]);
+
   async function handleAdd(item: Recommendation) {
     setAdding((s) => ({ ...s, [item.ticker]: "loading" }));
     try {
       await addInvestment(userId, { ticker: item.ticker, assetName: item.assetName, assetType: item.assetType });
       setOwnedTickers((t) => [...t, item.ticker]);
       setAdding((s) => ({ ...s, [item.ticker]: "idle" }));
+      toast(`${item.ticker} adicionado à carteira`);
     } catch {
       setAdding((s) => ({ ...s, [item.ticker]: "error" }));
     }
@@ -80,7 +92,7 @@ export default function Recommendations() {
 
       <p className="mt-2 text-sm text-muted">Preços de referência do catálogo; não são cotações em tempo real.</p>
 
-      <div className="-mx-6 mt-5 flex gap-2 overflow-x-auto px-6 pb-1 [scrollbar-width:none]" aria-label="Filtrar por tipo de ativo">
+      <div className="-mx-6 mt-5 flex gap-2 overflow-x-auto px-6 pb-1 [scrollbar-width:none] md:mx-0 md:flex-wrap md:px-0" aria-label="Filtrar por tipo de ativo">
         {FILTERS.map((f) => (
           <Chip key={f} selected={filter === f} onClick={() => setFilter(f)}>
             <span className="whitespace-nowrap">{f === "ALL" ? "Todos" : ASSET_TYPE_LABEL[f]}</span>
@@ -88,11 +100,11 @@ export default function Recommendations() {
         ))}
       </div>
 
-      <section className="mt-6 flex flex-col gap-5" aria-live="polite">
+      <section className="mt-6 grid gap-5 md:grid-cols-2" aria-live="polite">
         {load.status === "loading" && [0, 1, 2].map((i) => <CardSkeleton key={i} />)}
 
         {load.status === "error" && (
-          <div className="rounded-3xl border border-line bg-white p-6 text-center">
+          <div className="rounded-3xl border border-line bg-white p-6 text-center md:col-span-2">
             <p className="text-lg text-ink">{load.message}</p>
             <button
               type="button"
@@ -105,7 +117,7 @@ export default function Recommendations() {
         )}
 
         {load.status === "done" && visible.length === 0 && (
-          <p className="rounded-3xl border border-line bg-white p-6 text-center text-muted">
+          <p className="rounded-3xl border border-line bg-white p-6 text-center text-muted md:col-span-2">
             {filter === "ALL"
               ? "Ainda não há ativos recomendados para o seu perfil."
               : `Nenhuma recomendação de ${ASSET_TYPE_LABEL[filter]} para o seu perfil.`}
@@ -116,6 +128,7 @@ export default function Recommendations() {
           <RecommendationCard
             key={item.id}
             item={item}
+            highlighted={item.ticker === focused}
             addState={ownedTickers.includes(item.ticker) ? "added" : (adding[item.ticker] ?? "idle")}
             onAdd={() => handleAdd(item)}
           />

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import type { Route } from "./+types/home";
 import { AllocationDonut } from "~/components/allocation-donut";
+import { EvolutionChart } from "~/components/evolution-chart";
 import { Trend } from "~/components/trend";
 import { dateBR, money, qty } from "~/lib/format";
 import { useOnboarding } from "~/lib/onboarding";
@@ -63,93 +64,136 @@ export default function Home() {
         </Link>
       </header>
 
-      <section className="mt-6 rounded-3xl bg-brand p-6 text-white">
-        <p className="text-white/80">Patrimônio</p>
-        {load.status === "loading" && <div className="mt-2 h-12 w-56 animate-pulse rounded-lg bg-white/15" />}
-        {load.status === "error" && (
-          <p className="mt-2">
-            {load.message}{" "}
-            <button type="button" onClick={retry} className="font-semibold underline">
-              Tentar de novo
-            </button>
-          </p>
-        )}
-        {summary && (
-          <>
-            <p className="mt-1 font-serif text-[2.6rem] leading-tight font-bold">{money(summary.currentValue)}</p>
-            <p className="mt-1 flex flex-wrap items-baseline justify-between gap-x-3 text-[1.05rem]">
-              <Trend gain={summary.gain} gainPct={summary.gainPct} onDark />
-              <span className="text-white/80">Investido {money(summary.totalInvested)}</span>
+      <div className="mt-6 grid items-start gap-5 md:grid-cols-2">
+        <section className="rounded-3xl bg-brand p-6 text-white md:col-span-2 lg:p-8">
+          <p className="text-white/80">Patrimônio</p>
+          {load.status === "loading" && <div className="mt-2 h-12 w-56 animate-pulse rounded-lg bg-white/15" />}
+          {load.status === "error" && (
+            <p className="mt-2">
+              {load.message}{" "}
+              <button type="button" onClick={retry} className="font-semibold underline">
+                Tentar de novo
+              </button>
             </p>
-          </>
+          )}
+          {summary && (
+            <>
+              <p className="mt-1 font-serif text-[2.6rem] leading-tight font-bold">{money(summary.currentValue)}</p>
+              <p className="mt-1 flex flex-wrap items-baseline justify-between gap-x-3 text-[1.05rem]">
+                <Trend gain={summary.gain} gainPct={summary.gainPct} onDark />
+                <span className="text-white/80">Investido {money(summary.totalInvested)}</span>
+              </p>
+            </>
+          )}
+        </section>
+
+        {summary && summary.recentContributions.length > 0 && (
+          <Card title="Evolução do patrimônio" className="md:col-span-2">
+            <p className="mt-1 text-sm text-muted">
+              Total investido a cada aporte. O valor de hoje usa os preços atuais do catálogo.
+            </p>
+            <div className="mt-4">
+              <EvolutionChart contributions={summary.recentContributions} currentValue={summary.currentValue} />
+            </div>
+          </Card>
         )}
-      </section>
 
-      {summary && summary.allocation.length > 0 && (
-        <Card title="Distribuição por tipo">
-          <div className="mt-4">
-            <AllocationDonut data={summary.allocation} />
-          </div>
-        </Card>
-      )}
+        {summary && summary.allocation.length > 0 && (
+          <Card title="Distribuição por tipo">
+            <div className="mt-4">
+              <AllocationDonut data={summary.allocation} />
+            </div>
+          </Card>
+        )}
 
-      {summary && summary.holdings.length === 0 && (
-        <Card title="Comece sua carteira">
-          <p className="mt-2 text-muted">
-            Veja os ativos recomendados para o seu perfil e adicione os primeiros à carteira.
-          </p>
-        </Card>
-      )}
-
-      {recommended && recommended.length > 0 && (
-        <Card
-          title="Recomendados para você"
-          action={
-            <Link to="/recomendacoes" className="shrink-0 font-semibold text-brand hover:underline">
-              Ver todos
+        {summary && summary.holdings.length === 0 && (
+          <Card title="Comece sua carteira">
+            <p className="mt-2 text-muted">
+              Veja os ativos recomendados para o seu perfil e adicione os primeiros à carteira.
+            </p>
+            <Link to="/recomendacoes" className="mt-3 inline-block font-semibold text-brand hover:underline">
+              Ver recomendações
             </Link>
-          }
-        >
-          <ul className="mt-2 divide-y divide-line">
-            {recommended.map((r) => (
-              <li key={r.id} className="flex items-center justify-between gap-4 py-4 last:pb-0">
-                <span className="min-w-0">
-                  <span className="block text-lg font-bold break-words text-ink">{r.ticker}</span>
-                  <span className="block text-muted">
-                    {ASSET_TYPE_LABEL[r.assetType]} · {RISK_LABEL[r.riskLevel].toLowerCase()}
+          </Card>
+        )}
+
+        {recommended && recommended.length > 0 && (
+          <Card
+            title="Recomendados para você"
+            action={
+              <Link to="/recomendacoes" className="shrink-0 font-semibold text-brand hover:underline">
+                Ver todos
+              </Link>
+            }
+          >
+            <ul className="mt-2 divide-y divide-line">
+              {recommended.map((r) => (
+                <li key={r.id} className="py-2 last:pb-0">
+                  <Link
+                    to={`/recomendacoes?ativo=${encodeURIComponent(r.ticker)}`}
+                    className="-mx-3 flex items-center justify-between gap-4 rounded-2xl px-3 py-2 transition hover:bg-brand-soft"
+                  >
+                    <span className="min-w-0">
+                      <span className="block text-lg font-bold break-words text-ink">{r.ticker}</span>
+                      <span className="block text-muted">
+                        {ASSET_TYPE_LABEL[r.assetType]} · {RISK_LABEL[r.riskLevel].toLowerCase()}
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-2 text-lg font-bold text-brand">
+                      {r.compatibilityScore}%
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden className="text-muted">
+                        <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+
+        {recommendationsError && <Card title="Recomendados para você"><p role="alert" className="mt-2 text-muted">{recommendationsError}</p><button type="button" className="mt-3 font-semibold text-brand underline" onClick={() => setRecommendationsAttempt((n) => n + 1)}>Tentar novamente</button></Card>}
+
+        {summary && summary.recentContributions.length > 0 && (
+          <Card
+            title="Últimos aportes"
+            action={
+              <Link to="/carteira" className="shrink-0 font-semibold text-brand hover:underline">
+                Ver carteira
+              </Link>
+            }
+          >
+            <ul className="mt-3 flex flex-col gap-3">
+              {summary.recentContributions.slice(0, 3).map((c) => (
+                <li key={c.id} className="flex items-baseline gap-2.5 text-[0.95rem]">
+                  <span className="w-10 shrink-0 text-muted tabular-nums">{dateBR(c.contributionDate, false)}</span>
+                  <span className="min-w-0 flex-1 text-ink">
+                    {c.ticker} · {qty(c.quantity)} {unitLabel(c.assetType, c.quantity)}
                   </span>
-                </span>
-                <span className="shrink-0 text-lg font-bold text-brand">{r.compatibilityScore}%</span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
-
-      {recommendationsError && <Card title="Recomendados para você"><p role="alert" className="mt-2 text-muted">{recommendationsError}</p><button type="button" className="mt-3 font-semibold text-brand underline" onClick={() => setRecommendationsAttempt((n) => n + 1)}>Tentar novamente</button></Card>}
-
-      {summary && summary.recentContributions.length > 0 && (
-        <Card title="Últimos aportes">
-          <ul className="mt-3 flex flex-col gap-3">
-            {summary.recentContributions.slice(0, 3).map((c) => (
-              <li key={c.id} className="flex items-baseline gap-2.5 text-[0.95rem]">
-                <span className="w-10 shrink-0 text-muted tabular-nums">{dateBR(c.contributionDate, false)}</span>
-                <span className="min-w-0 flex-1 text-ink">
-                  {c.ticker} · {qty(c.quantity)} {unitLabel(c.assetType, c.quantity)}
-                </span>
-                <span className="shrink-0 font-semibold text-ink tabular-nums">{money(c.amount)}</span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
+                  <span className="shrink-0 font-semibold text-ink tabular-nums">{money(c.amount)}</span>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+      </div>
     </>
   );
 }
 
-function Card({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
+function Card({
+  title,
+  action,
+  className = "",
+  children,
+}: {
+  title: string;
+  action?: React.ReactNode;
+  className?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <section className="mt-5 rounded-3xl border border-line bg-white p-6">
+    <section className={`rounded-3xl border border-line bg-white p-6 ${className}`}>
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-lg font-semibold text-ink">{title}</h2>
         {action}

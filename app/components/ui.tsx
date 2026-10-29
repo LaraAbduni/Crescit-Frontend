@@ -1,19 +1,24 @@
 import { useNavigate } from "react-router";
 
-/** Coluna centralizada com largura de celular e o botão principal fixo no rodapé. */
+/**
+ * Coluna centralizada com largura de celular e o botão principal fixo no rodapé.
+ * No computador, o conteúdo fica centralizado na vertical, com o botão logo abaixo.
+ */
 export function Screen({
   header,
   footer,
+  wide = false,
   children,
 }: {
   header?: React.ReactNode;
   footer?: React.ReactNode;
+  wide?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pt-10 pb-8">
+    <div className={`mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pt-10 pb-8 md:max-w-lg md:justify-center md:py-16 ${wide ? "lg:max-w-5xl lg:px-10" : ""}`}>
       {header}
-      <main className="flex flex-1 flex-col">{children}</main>
+      <main className="flex flex-1 flex-col md:flex-none">{children}</main>
       {footer && <div className="mt-8 flex flex-col gap-4">{footer}</div>}
     </div>
   );
@@ -109,12 +114,15 @@ export function OptionCard({
   description,
   selected,
   multiple = false,
+  shortcut,
   onSelect,
 }: {
   label: string;
   description?: string;
   selected: boolean;
   multiple?: boolean;
+  /** Tecla de atalho, mostrada só no computador */
+  shortcut?: number;
   onSelect: () => void;
 }) {
   return (
@@ -142,10 +150,15 @@ export function OptionCard({
             <span className="size-3 rounded-full bg-brand" />
           ))}
       </span>
-      <span className="flex flex-col">
+      <span className="flex flex-1 flex-col">
         <span className="text-[1.05rem] font-semibold leading-snug text-ink">{label}</span>
         {description && <span className="text-[0.9rem] text-muted">{description}</span>}
       </span>
+      {shortcut !== undefined && (
+        <kbd aria-hidden className="hidden size-7 shrink-0 place-items-center rounded-md border border-line bg-cream font-sans text-sm text-muted md:grid">
+          {shortcut}
+        </kbd>
+      )}
     </button>
   );
 }

@@ -17,14 +17,21 @@ export type AddState = "idle" | "loading" | "added" | "error";
 export function RecommendationCard({
   item,
   addState,
+  highlighted = false,
   onAdd,
 }: {
   item: Recommendation;
   addState: AddState;
+  highlighted?: boolean;
   onAdd: () => void;
 }) {
   return (
-    <article className="rounded-3xl border border-line bg-white p-6">
+    <article
+      id={`ativo-${item.ticker}`}
+      className={`flex scroll-mt-8 flex-col rounded-3xl border bg-white p-6 transition ${
+        highlighted ? "border-brand ring-2 ring-brand/30" : "border-line"
+      }`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-[40%] flex-1">
           <h2 className="text-2xl leading-tight font-bold break-words text-ink">{item.ticker}</h2>
@@ -52,12 +59,14 @@ export function RecommendationCard({
 
       <p className="mt-4 text-[1.05rem] leading-relaxed text-ink/80">{ASSET_TYPE_DESCRIPTION[item.assetType]}</p>
 
-      <AddButton state={addState} onClick={onAdd} />
-      {addState === "error" && (
-        <p role="alert" className="mt-2 text-sm text-aggressive">
-          Não foi possível adicionar. Tente de novo.
-        </p>
-      )}
+      <div className="mt-auto">
+        <AddButton state={addState} onClick={onAdd} />
+        {addState === "error" && (
+          <p role="alert" className="mt-2 text-sm text-aggressive">
+            Não foi possível adicionar. Tente de novo.
+          </p>
+        )}
+      </div>
     </article>
   );
 }
