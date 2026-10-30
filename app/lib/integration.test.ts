@@ -19,6 +19,22 @@ describe("contratos entre telas e serviços", () => {
       ["http://localhost:8082/recommendations/auth0%7Ctest/generate", "POST", "Bearer access-token"],
     ]);
   });
+  it("gera de novo quando o catálogo ganhou ativos depois da última geração", async () => {
+    fetchMock
+      .mockResolvedValueOnce(Response.json([{ id: "r", investorType: "MODERATE", ticker: "BOVA11", compatibilityScore: 80, createdAt: "2026-10-01T10:00:00" }]))
+      .mockResolvedValueOnce(Response.json([{ ticker: "LCI-90D", active: true, createdAt: "2026-10-30T09:00:00" }]))
+      .mockResolvedValueOnce(Response.json([{ id: "r2", investorType: "MODERATE", ticker: "LCI-90D", compatibilityScore: 90 }]));
+    const items = await getRecommendations(userId, "MODERATE");
+    expect(items.map((i) => i.ticker)).toEqual(["LCI-90D"]);
+    expect(fetchMock.mock.calls.map(([, options]) => options.method)).toEqual(["GET", "GET", "POST"]);
+  });
+  it("mantém as recomendações salvas quando o catálogo não mudou", async () => {
+    fetchMock
+      .mockResolvedValueOnce(Response.json([{ id: "r", investorType: "MODERATE", ticker: "BOVA11", compatibilityScore: 80, createdAt: "2026-10-01T10:00:00" }]))
+      .mockResolvedValueOnce(Response.json([{ ticker: "BOVA11", active: true, createdAt: "2026-09-01T09:00:00" }]));
+    await getRecommendations(userId, "MODERATE");
+    expect(fetchMock.mock.calls.map(([, options]) => options.method)).toEqual(["GET", "GET"]);
+  });
   it("reaproveita um investimento existente após conflito sem repetir a escrita", async () => {
     fetchMock.mockResolvedValueOnce(Response.json({ message: "exists" }, { status: 409 }))
       .mockResolvedValueOnce(Response.json([{ id: "investment", ticker: "BOVA11" }]));

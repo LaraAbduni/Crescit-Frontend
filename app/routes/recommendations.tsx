@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router";
 import type { Route } from "./+types/recommendations";
 import { PROFILE_TEXT_COLOR } from "~/components/profile-gauge";
 import { RecommendationCard } from "~/components/recommendation-card";
+import { AssetDetail } from "~/components/asset-detail";
 import { InvestmentForm } from "~/components/portfolio-forms";
 import { Sheet } from "~/components/sheet";
 import { useToast } from "~/components/toast";
@@ -11,13 +12,15 @@ import { useOnboarding } from "~/lib/onboarding";
 import { apiErrorMessage } from "~/lib/api";
 import { rankRecommendations, type RankedRecommendation } from "~/lib/analysis";
 import { NO_INSTITUTION } from "~/lib/institutions";
-import { addContribution, addInvestment } from "~/lib/portfolio";
+import { addContribution, addInvestment, displayName } from "~/lib/portfolio";
 import { usePortfolio } from "~/lib/use-portfolio";
 import { INVESTOR_TYPES } from "~/lib/profile";
 import {
   ASSET_TYPE_LABEL,
   RISK_SCOPE,
+  getAssets,
   getRecommendations,
+  type Asset,
   type AssetType,
   type Recommendation,
 } from "~/lib/recommendations";
@@ -42,11 +45,20 @@ export default function Recommendations() {
   const [attempt, setAttempt] = useState(0);
   const [filter, setFilter] = useState<AssetType | "ALL">("ALL");
   const [adding, setAdding] = useState<Recommendation | null>(null);
+  const [detail, setDetail] = useState<RankedRecommendation<Recommendation> | null>(null);
+  // Catálogo: taxa, liquidez e descrição de cada ativo (opcional; a tela funciona sem)
+  const [catalog, setCatalog] = useState<Map<string, Asset>>(new Map());
   const { load: portfolio, reload: reloadPortfolio } = usePortfolio(userId);
   const toast = useToast();
   // Vindo do Início (?ativo=PETR4), o card do ativo é rolado até a tela e destacado
   const [params] = useSearchParams();
   const focused = params.get("ativo");
+
+  useEffect(() => {
+    getAssets()
+      .then((assets) => setCatalog(new Map(assets.map((a) => [a.ticker, a]))))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -86,7 +98,9 @@ export default function Recommendations() {
       balances={r.balances}
       highlighted={r.item.ticker === focused}
       addState={r.owned ? "added" : "idle"}
+      asset={catalog.get(r.item.ticker)}
       onAdd={() => setAdding(r.item)}
+      onDetails={() => setDetail(r)}
     />
   );
 
@@ -151,17 +165,37 @@ export default function Recommendations() {
         )}
       </section>
 
+      {detail && (
+        <Sheet title={catalog.get(detail.item.ticker)?.rateType ? detail.item.assetName : `${detail.item.ticker} · ${detail.item.assetName}`} onClose={() => setDetail(null)}>
+          <AssetDetail
+            item={detail.item}
+            asset={catalog.get(detail.item.ticker)}
+            reason={detail.reason}
+            balances={detail.balances}
+            owned={detail.owned}
+            onAdd={() => {
+              setDetail(null);
+              setAdding(detail.item);
+            }}
+          />
+        </Sheet>
+      )}
+
       {adding && (
-        <Sheet title={`Adicionar ${adding.ticker}`} onClose={() => setAdding(null)}>
+        <Sheet title={`Adicionar ${catalog.get(adding.ticker)?.rateType ? adding.assetName : adding.ticker}`} onClose={() => setAdding(null)}>
           <InvestmentForm
-            initialAsset={adding}
+            initialAsset={catalog.get(adding.ticker)?.rateType ? undefined : adding}
+            initialFixed={(() => {
+              const a = catalog.get(adding.ticker);
+              return a?.rateType && a.rateValue ? { assetName: adding.assetName, rateType: a.rateType, rateValue: a.rateValue } : undefined;
+            })()}
             preferredInstitutions={preferredInstitutions}
             onSubmit={async (investment, contribution) => {
               const created = await addInvestment(userId, investment);
               await addContribution(userId, created.id, contribution);
               await reloadPortfolio();
               setAdding(null);
-              toast(`${created.ticker} adicionado à carteira`);
+              toast(`${displayName(created)} adicionado à carteira`);
             }}
           />
         </Sheet>

@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import type { Route } from "./+types/analysis";
+import { AllocationComparison } from "~/components/allocation-comparison";
 import { FixedIncomeComparator } from "~/components/fixed-income-comparator";
 import { useToast } from "~/components/toast";
 import { PageTitle, TextField } from "~/components/ui";
 import {
-  compareAllocation,
   monthlyHistory,
   monthLabel,
   portfolioAlerts,
@@ -132,49 +132,12 @@ function Card({ title, subtitle, className = "", children }: { title: string; su
 }
 
 function AllocationCard({ summary, investorType }: { summary: PortfolioSummary; investorType: InvestorType }) {
-  const rows = compareAllocation(summary, investorType);
-  const empty = summary.currentValue <= 0;
   return (
     <Card
       title="Carteira atual × referência"
       subtitle="A referência é um ponto de partida educativo do Crescit para o seu perfil, não uma recomendação individual."
     >
-      <ul className="mt-4 flex gap-x-5 text-sm text-muted" aria-hidden>
-        <li className="flex items-center gap-2">
-          <span className="h-2 w-4 rounded-full" style={{ background: BAR_COLOR }} /> Sua carteira
-        </li>
-        <li className="flex items-center gap-2">
-          <span className="h-3.5 w-0.5 rounded-full bg-ink" /> Referência
-        </li>
-      </ul>
-      <ul className="mt-4 flex flex-col gap-4">
-        {rows.map((r) => {
-          const diff = r.currentShare - r.targetShare;
-          const status = empty ? "" : Math.abs(diff) < 0.05 ? "No alvo" : diff > 0 ? "Acima" : "Abaixo";
-          return (
-            <li key={r.type}>
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="text-ink">{ASSET_TYPE_LABEL[r.type]}</span>
-                <span className="text-sm tabular-nums text-muted">
-                  <span className="font-semibold text-ink">{pct(r.currentShare)}</span> de {pct(r.targetShare)}
-                  {status && <span className="ml-2">· {status}</span>}
-                </span>
-              </div>
-              <div
-                className="relative mt-1.5 h-2 rounded-full bg-line/60"
-                role="img"
-                aria-label={`${ASSET_TYPE_LABEL[r.type]}: ${pct(r.currentShare)} da carteira, referência ${pct(r.targetShare)}`}
-              >
-                <div className="h-full rounded-full" style={{ width: `${Math.min(r.currentShare, 1) * 100}%`, background: BAR_COLOR }} />
-                <span
-                  className="absolute -top-1 h-4 w-0.5 -translate-x-1/2 rounded-full bg-ink"
-                  style={{ left: `${r.targetShare * 100}%` }}
-                />
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+      <AllocationComparison summary={summary} investorType={investorType} />
     </Card>
   );
 }

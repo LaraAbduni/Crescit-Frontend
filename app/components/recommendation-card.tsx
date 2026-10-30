@@ -2,9 +2,11 @@ import {
   ASSET_TYPE_DESCRIPTION,
   ASSET_TYPE_LABEL,
   RISK_LABEL,
+  type Asset,
   type Recommendation,
   type RiskLevel,
 } from "~/lib/recommendations";
+import { rateLabel } from "~/lib/fixed-income";
 import { money } from "~/lib/format";
 
 const RISK_BADGE: Record<RiskLevel, string> = {
@@ -21,9 +23,14 @@ export function RecommendationCard({
   reason,
   balances = false,
   highlighted = false,
+  asset,
   onAdd,
+  onDetails,
 }: {
   item: Recommendation;
+  /** Dados do catálogo: taxa, liquidez e descrição */
+  asset?: Asset;
+  onDetails?: () => void;
   addState: AddState;
   /** Por que este ativo para esta pessoa (carteira e perfil) */
   reason?: string;
@@ -41,8 +48,9 @@ export function RecommendationCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-[40%] flex-1">
-          <h2 className="text-2xl leading-tight font-bold break-words text-ink">{item.ticker}</h2>
-          <p className="mt-1 text-muted">{item.assetName}</p>
+          {/* Produtos de renda fixa por taxa não têm ticker de bolsa: o título é o nome */}
+          <h2 className="text-2xl leading-tight font-bold break-words text-ink">{asset?.rateType ? item.assetName : item.ticker}</h2>
+          <p className="mt-1 text-muted">{asset?.rateType ? "Produto de referência, disponível em vários bancos" : item.assetName}</p>
         </div>
         <div className="flex min-w-0 flex-wrap items-start justify-end gap-2">
           <Badge className="bg-line/60 text-ink">{ASSET_TYPE_LABEL[item.assetType]}</Badge>
@@ -60,12 +68,28 @@ export function RecommendationCard({
       )}
 
       <p className="mt-4 text-[1.05rem] leading-relaxed text-ink/80">{ASSET_TYPE_DESCRIPTION[item.assetType]}</p>
-      <p className="mt-2 text-sm text-muted">Preço de referência: {money(item.currentPrice)}</p>
+      <p className="mt-2 text-sm text-muted">
+        {asset?.rateType && asset.rateValue
+          ? [
+              rateLabel(asset.rateType, asset.rateValue),
+              asset.taxExempt ? "isento de IR" : null,
+              asset.liquidity ? `resgate: ${asset.liquidity.toLowerCase()}` : null,
+              asset.minimumInvestment ? `mínimo ${money(asset.minimumInvestment)}` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")
+          : `Preço de referência: ${money(item.currentPrice)}`}
+      </p>
 
-      <div className="mt-auto">
+      <div className="mt-auto flex flex-wrap items-center gap-x-5">
         <AddButton state={addState} onClick={onAdd} />
+        {onDetails && (
+          <button type="button" onClick={onDetails} className="mt-5 h-12 font-semibold text-brand hover:underline">
+            Ver detalhes
+          </button>
+        )}
         {addState === "error" && (
-          <p role="alert" className="mt-2 text-sm text-aggressive">
+          <p role="alert" className="mt-2 w-full text-sm text-aggressive">
             Não foi possível adicionar. Tente de novo.
           </p>
         )}

@@ -468,8 +468,11 @@ export function InvestmentForm({
   preferredInstitutions = [],
   initialInstitution = "",
   initialAsset,
+  initialFixed,
   onSubmit,
 }: {
+  /** Vindo das recomendações (renda fixa por taxa): nome e rentabilidade já preenchidos */
+  initialFixed?: { assetName: string; rateType: RateType; rateValue: number };
   /** Vindo das recomendações: ticker, nome, tipo e preço já preenchidos */
   initialAsset?: { ticker: string; assetName: string; assetType: AssetType; currentPrice?: number };
   /** Instituições que a pessoa já usa (cadastro e carteira), mostradas primeiro */
@@ -480,12 +483,12 @@ export function InvestmentForm({
 }) {
   const [catalog, setCatalog] = useState<Asset[]>([]);
   const [institution, setInstitution] = useState(initialInstitution);
-  const [kind, setKind] = useState<Kind>("market");
+  const [kind, setKind] = useState<Kind>(initialFixed ? "fixed" : "market");
   const [ticker, setTicker] = useState(initialAsset?.ticker ?? "");
-  const [assetName, setAssetName] = useState(initialAsset?.assetName ?? "");
+  const [assetName, setAssetName] = useState(initialFixed?.assetName ?? initialAsset?.assetName ?? "");
   const [assetType, setAssetType] = useState<AssetType | undefined>(initialAsset?.assetType);
-  const [rateType, setRateType] = useState<RateType>("CDI_PERCENT");
-  const [rateValue, setRateValue] = useState("");
+  const [rateType, setRateType] = useState<RateType>(initialFixed?.rateType ?? "CDI_PERCENT");
+  const [rateValue, setRateValue] = useState(rateInput(initialFixed?.rateValue));
   const [maturityDate, setMaturityDate] = useState("");
   const [values, setValues] = useState<ContributionValues>({
     quantity: "",

@@ -1,4 +1,5 @@
 import { recommendationsApi } from "./api";
+import type { RateType } from "./fixed-income";
 import type { InvestorType } from "./profile";
 
 // Valores dos enums do Serviço de Recomendações (entity/AssetType e RiskLevel).
@@ -53,15 +54,28 @@ export const ASSET_TYPE_DESCRIPTION: Record<AssetType, string> = {
   FUND: "Um gestor profissional escolhe os ativos: diversifica sem precisar escolher cada um.",
 };
 
+/** Explicação curta de cada nível de risco, para a tela de detalhe. */
+export const RISK_EXPLANATION: Record<RiskLevel, string> = {
+  LOW: "Oscila pouco. Adequado para todos os perfis, inclusive para a reserva de emergência.",
+  MEDIUM: "Pode ter altos e baixos no curto prazo. Indicado para objetivos de alguns anos.",
+  HIGH: "Pode variar bastante, para cima e para baixo. Só para quem aceita oscilações e pensa no longo prazo.",
+};
+
 /**
- * Busca as recomendações salvas. Se ainda não existirem (primeiro acesso
- * logo após o questionário), pede para o backend gerar.
+ * Busca as recomendações salvas. Gera de novo quando ainda não existem
+ * (primeiro acesso), quando o perfil mudou ou quando o catálogo ganhou
+ * ativos depois da última geração.
  */
 export async function getRecommendations(userId: string, investorType: InvestorType): Promise<Recommendation[]> {
   const id = encodeURIComponent(userId);
   let list = await recommendationsApi<Recommendation[]>("GET", `/recommendations/${id}`);
-  // Recomendações de um perfil antigo também são regeradas
-  if (list.length === 0 || list[0].investorType !== investorType) {
+  let stale = list.length === 0 || list[0].investorType !== investorType;
+  if (!stale) {
+    const generatedAt = list.reduce((max, r) => (r.createdAt > max ? r.createdAt : max), "");
+    const catalog = await getAssets().catch(() => []);
+    stale = catalog.some((a) => a.active && a.createdAt && a.createdAt > generatedAt);
+  }
+  if (stale) {
     list = await recommendationsApi<Recommendation[]>("POST", `/recommendations/${id}/generate`);
   }
   return sortByCompatibility(list);
@@ -75,6 +89,15 @@ export interface Asset {
   riskLevel: RiskLevel;
   currentPrice: number;
   active: boolean;
+  sector?: string | null;
+  createdAt?: string;
+  // Opcionais: produtos de renda fixa e textos para a tela de detalhe
+  rateType?: RateType | null;
+  rateValue?: number | null;
+  liquidity?: string | null;
+  taxExempt?: boolean | null;
+  minimumInvestment?: number | null;
+  description?: string | null;
 }
 
 /** Catálogo de ativos com o preço atual (GET /assets). */

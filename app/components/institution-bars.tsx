@@ -14,16 +14,8 @@ export function InstitutionBars({
       {data.map((d) => (
         <li key={d.institution}>
           <div className="flex items-baseline justify-between gap-3">
-            <span className="min-w-0 truncate text-ink">
-              {d.institution}{" "}
-              <span className="text-sm text-muted">
-                · {d.count} {d.count === 1 ? "ativo" : "ativos"}
-              </span>
-            </span>
-            <span className="shrink-0 tabular-nums">
-              <span className="font-semibold text-ink">{money(d.value)}</span>
-              <span className="ml-2 text-sm text-muted">{pct(d.share)}</span>
-            </span>
+            <span className="min-w-0 truncate text-ink">{d.institution}</span>
+            <span className="shrink-0 font-semibold text-ink tabular-nums">{money(d.value)}</span>
           </div>
           <div
             className="mt-1.5 h-2 overflow-hidden rounded-full bg-line/60"
@@ -35,6 +27,9 @@ export function InstitutionBars({
           >
             <div className="h-full rounded-full" style={{ width: `${d.share * 100}%`, background: BAR_COLOR }} />
           </div>
+          <p className="mt-1 text-sm text-muted tabular-nums">
+            {pct(d.share)} do patrimônio · {d.count} {d.count === 1 ? "ativo" : "ativos"}
+          </p>
         </li>
       ))}
     </ul>
