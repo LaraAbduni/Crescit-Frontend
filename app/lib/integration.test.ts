@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setAccessTokenGetter } from "./api";
-import { addInvestment, loadPortfolio } from "./portfolio";
+import { addInvestment, loadPortfolio, updateInvestment } from "./portfolio";
 import { getRecommendations } from "./recommendations";
 
 const fetchMock = vi.fn();
@@ -36,6 +36,13 @@ describe("contratos entre telas e serviços", () => {
     expect(summary).toMatchObject({ totalInvested: 200, currentValue: 240, gain: 40, gainPct: 0.2, hasMissingPrices: false });
     expect(summary.recentContributions[0]).toMatchObject({ ticker: "BOVA11", amount: 200 });
     expect(fetchMock.mock.calls.every(([, options]) => options.headers.Authorization === "Bearer access-token")).toBe(true);
+  });
+  it("edita o investimento com PUT enviando instituição e taxa", async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ id: "i", institution: "Itaú" }));
+    await updateInvestment(userId, "i", { ticker: "RF-ABC123", assetName: "CDB Itaú", assetType: "FIXED_INCOME", institution: "Itaú", rateType: "CDI_PERCENT", rateValue: 105 });
+    const [url, options] = fetchMock.mock.calls[0];
+    expect([url, options.method]).toEqual(["http://localhost:8083/portfolios/auth0%7Ctest/investments/i", "PUT"]);
+    expect(JSON.parse(options.body)).toMatchObject({ institution: "Itaú", rateType: "CDI_PERCENT", rateValue: 105 });
   });
   it("agrupa por instituição e estima a renda fixa pela taxa contratada", async () => {
     fetchMock.mockImplementation(async (url: string) => {

@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import type { Route } from "./+types/analysis";
+import { FixedIncomeComparator } from "~/components/fixed-income-comparator";
 import { useToast } from "~/components/toast";
 import { PageTitle, TextField } from "~/components/ui";
 import {
   compareAllocation,
   monthlyHistory,
   monthLabel,
-  MONTHLY_AMOUNT_DEFAULT,
   portfolioAlerts,
   suggestContribution,
   TARGET_ALLOCATION,
@@ -19,6 +19,7 @@ import type { PortfolioSummary } from "~/lib/portfolio";
 import { INVESTOR_TYPES, type InvestorType } from "~/lib/profile";
 import { ASSET_TYPE_LABEL, getRecommendations, type AssetType, type Recommendation } from "~/lib/recommendations";
 import { exportSpreadsheet } from "~/lib/spreadsheet";
+import { useMonthlyGoal } from "~/lib/use-monthly-goal";
 import { usePortfolio } from "~/lib/use-portfolio";
 
 export function meta({}: Route.MetaArgs) {
@@ -28,31 +29,11 @@ export function meta({}: Route.MetaArgs) {
 // Mesmo verde validado nos outros gráficos (série única, contraste >= 3:1 no branco)
 const BAR_COLOR = "#00916f";
 
-const goalKey = (userId: string) => `crescit:meta-mensal:${userId}`;
-
-/** Meta de aporte mensal: fica no navegador, com a faixa do cadastro como sugestão inicial. */
-function useMonthlyGoal(userId: string, fallback: number) {
-  const [goal, setGoal] = useState(fallback);
-  useEffect(() => {
-    try {
-      const saved = Number(localStorage.getItem(goalKey(userId)));
-      if (saved > 0) setGoal(saved);
-    } catch {}
-  }, [userId]);
-  const save = (value: number) => {
-    setGoal(value);
-    try {
-      localStorage.setItem(goalKey(userId), String(value));
-    } catch {}
-  };
-  return [goal, save] as const;
-}
-
 export default function Analysis() {
-  const { profile, context } = useOnboarding();
+  const { profile } = useOnboarding();
   const { userId, investorType } = profile!;
   const { load, retry } = usePortfolio(userId);
-  const [goal, setGoal] = useMonthlyGoal(userId, MONTHLY_AMOUNT_DEFAULT[context?.monthlyAmount ?? ""] ?? 1000);
+  const [goal, setGoal] = useMonthlyGoal(userId);
   const [recommended, setRecommended] = useState<Recommendation[]>([]);
   const [exporting, setExporting] = useState(false);
   const toast = useToast();
@@ -98,7 +79,19 @@ export default function Analysis() {
         )}
       </div>
 
-      {load.status === "loading" && <div className="mt-6 h-64 animate-pulse rounded-3xl border border-line bg-white" aria-hidden />}
+      {load.status === "loading" && (
+        <div className="mt-6 grid animate-pulse items-start gap-5 lg:grid-cols-2" aria-hidden>
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="rounded-3xl border border-line bg-white p-6">
+              <div className="h-5 w-48 rounded bg-line/70" />
+              <div className="mt-3 h-3 w-full rounded bg-line/50" />
+              <div className="mt-6 h-2 w-full rounded-full bg-line/60" />
+              <div className="mt-5 h-2 w-full rounded-full bg-line/60" />
+              <div className="mt-5 h-2 w-2/3 rounded-full bg-line/60" />
+            </div>
+          ))}
+        </div>
+      )}
 
       {load.status === "error" && (
         <div className="mt-6 rounded-3xl border border-line bg-white p-6 text-center">
@@ -115,6 +108,13 @@ export default function Analysis() {
           <SuggestionCard summary={load.summary} investorType={investorType} goal={goal} recommended={recommended} />
           <AlertsCard alerts={portfolioAlerts(load.summary, today)} empty={load.summary.holdings.length === 0} />
           <MonthlyCard summary={load.summary} goal={goal} onGoalChange={setGoal} today={today} />
+          <Card
+            title="Comparar renda fixa"
+            subtitle="Qual rende mais depois do imposto? Compare um CDB com uma LCI, ou dois investimentos seus."
+            className="lg:col-span-2"
+          >
+            <FixedIncomeComparator holdings={load.summary.holdings} />
+          </Card>
         </div>
       )}
     </>

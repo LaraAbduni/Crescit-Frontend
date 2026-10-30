@@ -7,14 +7,23 @@ import { QUESTIONS } from "~/lib/profile";
 export function meta({}: Route.MetaArgs) {
   return [
     { title: "Crescit" },
-    { name: "description", content: "Recomendações de investimento de acordo com o seu perfil." },
+    { name: "description", content: "Todos os seus investimentos, de todos os bancos, num lugar só, comparados com o ideal para o seu perfil." },
   ];
 }
 
 const HIGHLIGHTS = [
-  { title: "Descubra seu perfil", text: `${QUESTIONS.length} perguntas rápidas sobre seus objetivos e sua experiência.` },
-  { title: "Receba recomendações", text: "Ativos compatíveis com o seu perfil de investidor." },
-  { title: "Acompanhe sua carteira", text: "Seus aportes e a evolução do patrimônio em um só lugar." },
+  {
+    title: "Organize",
+    text: "CDBs, ações e fundos de cada banco ou corretora juntos, com o patrimônio total e por instituição.",
+  },
+  {
+    title: "Compare",
+    text: `Responda ${QUESTIONS.length} perguntas sobre o seu perfil e veja sua carteira ao lado da referência ideal para ele.`,
+  },
+  {
+    title: "Decida o próximo passo",
+    text: "Saiba onde colocar o próximo aporte ou, se nunca investiu, siga um plano para começar do zero.",
+  },
 ];
 
 export default function Welcome() {
@@ -28,10 +37,11 @@ export default function Welcome() {
       <div className="flex flex-1 flex-col lg:grid lg:grid-cols-2 lg:gap-x-16 lg:gap-y-10">
         <div className="mt-12 lg:col-start-1 lg:row-start-1 lg:mt-16 lg:self-end">
           <h1 className="font-serif text-[2.6rem] leading-[1.1] font-bold text-ink lg:text-[3.4rem]">
-            Invista com clareza, no seu ritmo.
+            Todos os seus investimentos, num lugar só.
           </h1>
           <p className="mt-4 text-lg text-muted lg:text-xl">
-            O Crescit entende quem você é como investidor e mostra os caminhos que fazem sentido para você.
+            Junte o que você tem no Nubank, no Itaú, no BTG ou em qualquer outro banco. O Crescit compara com o
+            ideal para o seu perfil e mostra o que fazer a seguir.
           </p>
         </div>
 

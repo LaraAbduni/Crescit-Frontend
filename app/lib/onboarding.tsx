@@ -5,7 +5,7 @@ import { getProfile } from "./profile-api";
 import type { InvestorProfileResponse, Responses } from "./profile";
 
 export interface Account { name: string; email: string; }
-/** Preferências desta sessão; não fazem parte do contrato atual das APIs. */
+/** Bancos e valor mensal do cadastro. Ficam neste navegador (não fazem parte do contrato das APIs). */
 export interface FinancialContext { banks: string[]; monthlyAmount?: string; }
 interface OnboardingState {
   userId?: string;
@@ -25,6 +25,8 @@ interface OnboardingValue extends OnboardingState {
 }
 
 const storageKey = (id: string) => `crescit:onboarding:v3:${id}`;
+// O contexto fica salvo entre sessões: Análise, Carteira e Primeiros passos dependem dele
+const contextKey = (id: string) => `crescit:contexto:v1:${id}`;
 const OnboardingContext = createContext<OnboardingValue | null>(null);
 
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
@@ -52,6 +54,10 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         draft = { answers: parsed.answers ?? {}, context: parsed.context };
       }
     } catch { /* O rascunho é opcional. */ }
+    try {
+      const savedContext = localStorage.getItem(contextKey(userId));
+      if (savedContext) draft.context = JSON.parse(savedContext);
+    } catch { /* Opcional também. */ }
 
     const account = { name: user?.name || user?.nickname || "investidor", email: user?.email || "" };
     getProfile(userId)
@@ -73,6 +79,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     try {
       // O perfil sempre vem do backend. Tokens nunca passam por este armazenamento.
       sessionStorage.setItem(storageKey(userId), JSON.stringify({ answers: state.answers, context: state.context }));
+      if (state.context) localStorage.setItem(contextKey(userId), JSON.stringify(state.context));
     } catch { /* Segue em memória se o navegador bloquear o armazenamento. */ }
   }, [state, ready, userId]);
 

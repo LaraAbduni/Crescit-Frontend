@@ -17,12 +17,23 @@ function Probe() {
 function App() { return <OnboardingProvider><Probe /></OnboardingProvider>; }
 beforeEach(() => {
   sessionStorage.clear();
+  localStorage.clear();
   auth.isAuthenticated = true;
   auth.user = { sub: "auth0|a", name: "Ana", email: "ana@example.com" };
 });
 afterEach(cleanup);
 
 describe("sessão e recuperação de perfil", () => {
+  it("lembra bancos e valor mensal em uma nova sessão", async () => {
+    localStorage.setItem("crescit:contexto:v1:auth0|a", JSON.stringify({ banks: ["Itaú"], monthlyAmount: "500_2000" }));
+    vi.mocked(getProfile).mockResolvedValueOnce(profile("auth0|a"));
+    function ContextProbe() {
+      const state = useOnboarding();
+      return <output>{state.ready ? state.context?.banks.join(",") : "carregando"}</output>;
+    }
+    render(<OnboardingProvider><ContextProbe /></OnboardingProvider>);
+    await screen.findByText("Itaú");
+  });
   it("não busca dados de visitantes", async () => {
     auth.isAuthenticated = false;
     render(<App />);

@@ -5,6 +5,7 @@ import {
   type Recommendation,
   type RiskLevel,
 } from "~/lib/recommendations";
+import { money } from "~/lib/format";
 
 const RISK_BADGE: Record<RiskLevel, string> = {
   LOW: "bg-conservative/15 text-brand",
@@ -17,11 +18,17 @@ export type AddState = "idle" | "loading" | "added" | "error";
 export function RecommendationCard({
   item,
   addState,
+  reason,
+  balances = false,
   highlighted = false,
   onAdd,
 }: {
   item: Recommendation;
   addState: AddState;
+  /** Por que este ativo para esta pessoa (carteira e perfil) */
+  reason?: string;
+  /** Ajuda a carteira a chegar na referência do perfil */
+  balances?: boolean;
   highlighted?: boolean;
   onAdd: () => void;
 }) {
@@ -43,21 +50,17 @@ export function RecommendationCard({
         </div>
       </div>
 
-      <div className="mt-5 flex items-center gap-4">
-        <div
-          className="h-2 flex-1 overflow-hidden rounded-full bg-line/60"
-          role="meter"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={item.compatibilityScore}
-          aria-label="Compatibilidade com o seu perfil"
-        >
-          <div className="h-full rounded-full bg-brand" style={{ width: `${item.compatibilityScore}%` }} />
+      {reason && (
+        <div className={`mt-5 rounded-2xl px-4 py-3 ${balances ? "bg-brand-soft" : "bg-cream"}`}>
+          <p className="text-sm font-semibold uppercase tracking-[0.08em] text-brand">
+            {balances ? "Equilibra sua carteira" : "Por que para você"}
+          </p>
+          <p className="mt-1 text-ink">{reason}</p>
         </div>
-        <span className="shrink-0 text-lg font-bold text-ink">{item.compatibilityScore}% compatível</span>
-      </div>
+      )}
 
       <p className="mt-4 text-[1.05rem] leading-relaxed text-ink/80">{ASSET_TYPE_DESCRIPTION[item.assetType]}</p>
+      <p className="mt-2 text-sm text-muted">Preço de referência: {money(item.currentPrice)}</p>
 
       <div className="mt-auto">
         <AddButton state={addState} onClick={onAdd} />

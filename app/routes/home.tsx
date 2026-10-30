@@ -1,17 +1,17 @@
-import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import type { Route } from "./+types/home";
 import { AllocationDonut } from "~/components/allocation-donut";
 import { EvolutionChart } from "~/components/evolution-chart";
 import { InstitutionBars } from "~/components/institution-bars";
 import { Trend } from "~/components/trend";
-import { dateBR, money, qty } from "~/lib/format";
+import { monthlyHistory, monthLabel, portfolioAlerts, suggestContribution } from "~/lib/analysis";
+import { money, todayISO } from "~/lib/format";
 import { useOnboarding } from "~/lib/onboarding";
-import { displayName, unitLabel } from "~/lib/portfolio";
+import type { PortfolioSummary } from "~/lib/portfolio";
 import { INVESTOR_TYPES, type InvestorType } from "~/lib/profile";
-import { ASSET_TYPE_LABEL, getRecommendations, RISK_LABEL, type Recommendation } from "~/lib/recommendations";
+import { ASSET_TYPE_LABEL } from "~/lib/recommendations";
+import { useMonthlyGoal } from "~/lib/use-monthly-goal";
 import { usePortfolio } from "~/lib/use-portfolio";
-import { apiErrorMessage } from "~/lib/api";
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "Início · Crescit" }];
@@ -32,18 +32,7 @@ export default function Home() {
   const { account, profile } = useOnboarding();
   const { userId, investorType } = profile!;
   const { load, retry } = usePortfolio(userId);
-  const [recommended, setRecommended] = useState<Recommendation[] | null>(null);
-  const [recommendationsError, setRecommendationsError] = useState<string>();
-  const [recommendationsAttempt, setRecommendationsAttempt] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    setRecommendationsError(undefined);
-    getRecommendations(userId, investorType)
-      .then((list) => { if (!cancelled) setRecommended(list.slice(0, 2)); })
-      .catch((e) => { if (!cancelled) setRecommendationsError(apiErrorMessage(e, "Não foi possível carregar suas recomendações.")); });
-    return () => { cancelled = true; };
-  }, [userId, investorType, recommendationsAttempt]);
+  const [goal] = useMonthlyGoal(userId);
 
   const pill = PROFILE_PILL[investorType];
   const firstName = account?.name.split(" ")[0];
@@ -82,11 +71,16 @@ export default function Home() {
               <p className="mt-1 font-serif text-[2.6rem] leading-tight font-bold">{money(summary.currentValue)}</p>
               <p className="mt-1 flex flex-wrap items-baseline justify-between gap-x-3 text-[1.05rem]">
                 <Trend gain={summary.gain} gainPct={summary.gainPct} onDark />
-                <span className="text-white/80">Investido {money(summary.totalInvested)}</span>
+                <span className="text-white/80">
+                  Investido {money(summary.totalInvested)}
+                  {summary.byInstitution.length > 1 && ` em ${summary.byInstitution.length} instituições`}
+                </span>
               </p>
             </>
           )}
         </section>
+
+        {summary && <NextStep summary={summary} investorType={investorType} goal={goal} />}
 
         {summary && summary.recentContributions.length > 0 && (
           <Card title="Evolução do patrimônio" className="md:col-span-2">
@@ -99,20 +93,12 @@ export default function Home() {
           </Card>
         )}
 
-        {summary && summary.allocation.length > 0 && (
-          <Card title="Distribuição por tipo">
-            <div className="mt-4">
-              <AllocationDonut data={summary.allocation} />
-            </div>
-          </Card>
-        )}
-
         {summary && summary.byInstitution.length > 0 && summary.currentValue > 0 && (
           <Card
             title="Por instituição"
             action={
               <Link to="/carteira" className="shrink-0 font-semibold text-brand hover:underline">
-                Ver detalhes
+                Ver carteira
               </Link>
             }
           >
@@ -122,79 +108,94 @@ export default function Home() {
           </Card>
         )}
 
-        {summary && summary.holdings.length === 0 && (
-          <Card title="Comece sua carteira">
-            <p className="mt-2 text-muted">
-              Veja os ativos recomendados para o seu perfil e adicione os primeiros à carteira.
-            </p>
-            <Link to="/recomendacoes" className="mt-3 inline-block font-semibold text-brand hover:underline">
-              Ver recomendações
-            </Link>
-          </Card>
-        )}
-
-        {recommended && recommended.length > 0 && (
+        {summary && summary.allocation.length > 0 && (
           <Card
-            title="Recomendados para você"
+            title="Por tipo de ativo"
             action={
-              <Link to="/recomendacoes" className="shrink-0 font-semibold text-brand hover:underline">
-                Ver todos
+              <Link to="/analise" className="shrink-0 font-semibold text-brand hover:underline">
+                Comparar
               </Link>
             }
           >
-            <ul className="mt-2 divide-y divide-line">
-              {recommended.map((r) => (
-                <li key={r.id} className="py-2 last:pb-0">
-                  <Link
-                    to={`/recomendacoes?ativo=${encodeURIComponent(r.ticker)}`}
-                    className="-mx-3 flex items-center justify-between gap-4 rounded-2xl px-3 py-2 transition hover:bg-brand-soft"
-                  >
-                    <span className="min-w-0">
-                      <span className="block text-lg font-bold break-words text-ink">{r.ticker}</span>
-                      <span className="block text-muted">
-                        {ASSET_TYPE_LABEL[r.assetType]} · {RISK_LABEL[r.riskLevel].toLowerCase()}
-                      </span>
-                    </span>
-                    <span className="flex shrink-0 items-center gap-2 text-lg font-bold text-brand">
-                      {r.compatibilityScore}%
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden className="text-muted">
-                        <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        )}
-
-        {recommendationsError && <Card title="Recomendados para você"><p role="alert" className="mt-2 text-muted">{recommendationsError}</p><button type="button" className="mt-3 font-semibold text-brand underline" onClick={() => setRecommendationsAttempt((n) => n + 1)}>Tentar novamente</button></Card>}
-
-        {summary && summary.recentContributions.length > 0 && (
-          <Card
-            title="Últimos aportes"
-            action={
-              <Link to="/carteira" className="shrink-0 font-semibold text-brand hover:underline">
-                Ver carteira
-              </Link>
-            }
-          >
-            <ul className="mt-3 flex flex-col gap-3">
-              {summary.recentContributions.slice(0, 3).map((c) => (
-                <li key={c.id} className="flex items-baseline gap-2.5 text-[0.95rem]">
-                  <span className="w-10 shrink-0 text-muted tabular-nums">{dateBR(c.contributionDate, false)}</span>
-                  <span className="min-w-0 flex-1 text-ink">
-                    {displayName(c)}
-                    {!c.amountBased && ` · ${qty(c.quantity)} ${unitLabel(c.assetType, c.quantity)}`}
-                  </span>
-                  <span className="shrink-0 font-semibold text-ink tabular-nums">{money(c.amount)}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="mt-4">
+              <AllocationDonut data={summary.allocation} />
+            </div>
           </Card>
         )}
       </div>
     </>
+  );
+}
+
+/**
+ * A coisa mais útil a fazer agora: começar (carteira vazia), resolver um
+ * alerta importante ou fazer o aporte do mês.
+ */
+function NextStep({ summary, investorType, goal }: { summary: PortfolioSummary; investorType: InvestorType; goal: number }) {
+  const today = todayISO();
+
+  if (summary.holdings.length === 0) {
+    return (
+      <NextStepCard
+        title="Comece sua carteira"
+        text="Nunca investiu? Monte um plano em 4 passos, da reserva de emergência ao primeiro aporte. Já investe? Cadastre o que você tem em cada banco."
+        links={[
+          { to: "/primeiros-passos", label: "Ver primeiros passos" },
+          { to: "/carteira", label: "Cadastrar investimentos" },
+        ]}
+      />
+    );
+  }
+
+  const warning = portfolioAlerts(summary, today).find((a) => a.level === "warning");
+  if (warning) {
+    return <NextStepCard title={warning.title} text={warning.text} links={[{ to: "/analise", label: "Ver análise" }]} />;
+  }
+
+  const thisMonth = monthlyHistory(summary, today).find((m) => m.month === today.slice(0, 7));
+  const done = thisMonth?.contributed ?? 0;
+  const missing = Math.max(goal - done, 0);
+  if (missing > 0) {
+    const split = suggestContribution(summary, investorType, missing).slice(0, 2);
+    return (
+      <NextStepCard
+        title={`Faltam ${money(missing)} para a meta de ${monthLabel(today.slice(0, 7)).split(" ")[0]}`}
+        text={
+          split.length > 0
+            ? `Para equilibrar a carteira: ${split.map((s) => `${money(s.amount)} em ${ASSET_TYPE_LABEL[s.type]}`).join(" e ")}.`
+            : "Sua carteira está na referência do perfil; pode manter a divisão atual."
+        }
+        links={[
+          { to: "/recomendacoes", label: "Ver sugestões" },
+          { to: "/analise", label: "Ver análise" },
+        ]}
+      />
+    );
+  }
+
+  return (
+    <NextStepCard
+      title="Meta do mês cumprida"
+      text="Seus aportes deste mês já chegaram na meta. Veja como a carteira está em relação ao seu perfil."
+      links={[{ to: "/analise", label: "Ver análise" }]}
+    />
+  );
+}
+
+function NextStepCard({ title, text, links }: { title: string; text: string; links: { to: string; label: string }[] }) {
+  return (
+    <section className="rounded-3xl border-2 border-brand/25 bg-brand-soft p-6 md:col-span-2" aria-label="Próximo passo">
+      <p className="text-sm font-semibold uppercase tracking-[0.12em] text-brand">Próximo passo</p>
+      <h2 className="mt-1 text-xl font-semibold text-ink">{title}</h2>
+      <p className="mt-1 text-ink/80">{text}</p>
+      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
+        {links.map((l) => (
+          <Link key={l.to} to={l.to} className="font-semibold text-brand hover:underline">
+            {l.label}
+          </Link>
+        ))}
+      </div>
+    </section>
   );
 }
 

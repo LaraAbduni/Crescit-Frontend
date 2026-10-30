@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compareAllocation, monthlyHistory, portfolioAlerts, suggestContribution } from "./analysis";
+import { compareAllocation, monthlyHistory, portfolioAlerts, rankRecommendations, suggestContribution } from "./analysis";
 import type { Holding, PortfolioSummary } from "./portfolio";
 
 function holding(partial: Partial<Holding>): Holding {
@@ -62,6 +62,20 @@ describe("análise da carteira", () => {
     const alerts = portfolioAlerts(s, "2026-10-30");
     expect(alerts.map((a) => a.id)).toEqual(["fgc-Itaú", "concentracao-petr", "vencimento-cdb"]);
     expect(alerts.find((a) => a.id === "vencimento-cdb")?.text).toContain("Faltam 21 dias");
+  });
+
+  it("prioriza recomendações que equilibram a carteira e explica o motivo", () => {
+    const recs = [
+      { ticker: "TESOURO-SELIC", assetType: "FIXED_INCOME" as const, riskLevel: "LOW" },
+      { ticker: "HGLG11", assetType: "FII" as const, riskLevel: "MEDIUM" },
+      { ticker: "BOVA11", assetType: "ETF" as const, riskLevel: "MEDIUM" },
+      { ticker: "KNRI11", assetType: "FII" as const, riskLevel: "MEDIUM" },
+    ];
+    const ranked = rankRecommendations(recs, onlyFixed, "MODERATE", ["KNRI11"]);
+    expect(ranked.map((r) => r.item.ticker)).toEqual(["BOVA11", "HGLG11", "TESOURO-SELIC", "KNRI11"]);
+    expect(ranked[0]).toMatchObject({ balances: true, reason: "Sua carteira tem 0% neste tipo de ativo, e a referência do seu perfil é 15%." });
+    expect(ranked[2]).toMatchObject({ balances: false });
+    expect(ranked[3]).toMatchObject({ owned: true, balances: false });
   });
 
   it("monta o histórico mensal com os meses sem aporte", () => {

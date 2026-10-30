@@ -210,3 +210,54 @@ export const MONTHLY_AMOUNT_DEFAULT: Record<string, number> = {
   "2000_5000": 3000,
   ACIMA_5000: 5000,
 };
+
+export interface RankedRecommendation<T> {
+  item: T;
+  /** Por que este ativo, em uma frase, a partir da carteira e do perfil */
+  reason: string;
+  /** O tipo está abaixo da referência: comprar ajuda a equilibrar a carteira */
+  balances: boolean;
+  owned: boolean;
+}
+
+const pctText = (fraction: number) => `${Math.round(fraction * 100)}%`;
+
+/**
+ * Ordena as recomendações pelo que mais ajuda a carteira a chegar na
+ * referência do perfil, e explica o motivo de cada uma. Ativos que a pessoa
+ * já tem vão para o fim.
+ */
+export function rankRecommendations<T extends { ticker: string; assetType: AssetType; riskLevel: string }>(
+  items: T[],
+  summary: PortfolioSummary | null,
+  investorType: InvestorType,
+  ownedTickers: string[],
+): RankedRecommendation<T>[] {
+  const target = TARGET_ALLOCATION[investorType];
+  const total = summary?.currentValue ?? 0;
+  const shareOf = (type: AssetType) => (total > 0 ? (summary!.allocation.find((a) => a.type === type)?.value ?? 0) / total : 0);
+  const riskOrder: Record<string, number> = { LOW: 0, MEDIUM: 1, HIGH: 2 };
+
+  const ranked = items.map((item) => {
+    const current = shareOf(item.assetType);
+    const wanted = target[item.assetType];
+    const deficit = wanted - current;
+    const owned = ownedTickers.includes(item.ticker);
+    const balances = !owned && deficit > 0.02;
+    let reason: string;
+    if (owned) reason = "Já está na sua carteira. Novos aportes aumentam a sua posição.";
+    else if (total <= 0) reason = `Para começar: a referência do seu perfil tem ${pctText(wanted)} neste tipo de ativo.`;
+    else if (balances) reason = `Sua carteira tem ${pctText(current)} neste tipo de ativo, e a referência do seu perfil é ${pctText(wanted)}.`;
+    else reason = `Você já tem ${pctText(current)} neste tipo de ativo, perto ou acima da referência de ${pctText(wanted)}.`;
+    return { item, reason, balances, owned, deficit };
+  });
+
+  ranked.sort(
+    (a, b) =>
+      Number(a.owned) - Number(b.owned) ||
+      b.deficit - a.deficit ||
+      (riskOrder[a.item.riskLevel] ?? 1) - (riskOrder[b.item.riskLevel] ?? 1) ||
+      a.item.ticker.localeCompare(b.item.ticker),
+  );
+  return ranked.map(({ deficit: _, ...r }) => r);
+}

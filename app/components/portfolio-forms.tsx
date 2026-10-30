@@ -4,7 +4,7 @@ import { money, parseDecimal, todayISO } from "~/lib/format";
 import { apiErrorMessage } from "~/lib/api";
 import { RATE_TYPE_LABEL, type RateType } from "~/lib/fixed-income";
 import { INSTITUTIONS } from "~/lib/institutions";
-import { generatedTicker, type ContributionRequest, type InvestmentRequest } from "~/lib/portfolio";
+import { generatedTicker, type ContributionRequest, type Investment, type InvestmentRequest } from "~/lib/portfolio";
 import { ASSET_TYPE_LABEL, getAssets, type Asset, type AssetType } from "~/lib/recommendations";
 
 interface ContributionValues {
@@ -239,6 +239,199 @@ export function ContributionForm({
   );
 }
 
+/** Escolha da instituição entre as sugeridas, ou digitada em "Outra". */
+function InstitutionField({
+  value,
+  onChange,
+  options,
+  error,
+  legend = "Onde está esse investimento?",
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: string[];
+  error?: string;
+  legend?: string;
+}) {
+  const [other, setOther] = useState(value !== "" && !options.includes(value));
+  return (
+    <fieldset className="flex flex-col gap-2">
+      <legend className="mb-2 font-medium text-ink">{legend}</legend>
+      <div className="flex flex-wrap gap-2">
+        {options.map((name) => (
+          <Chip
+            key={name}
+            selected={!other && value === name}
+            onClick={() => {
+              setOther(false);
+              onChange(name);
+            }}
+          >
+            {name}
+          </Chip>
+        ))}
+        <Chip
+          selected={other}
+          onClick={() => {
+            setOther(true);
+            onChange("");
+          }}
+        >
+          Outra
+        </Chip>
+      </div>
+      {other && (
+        <div className="mt-2">
+          <TextField
+            label="Nome da instituição"
+            placeholder="Banco, corretora..."
+            maxLength={60}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+          />
+        </div>
+      )}
+      {error && <span className="text-sm text-aggressive">{error}</span>}
+    </fieldset>
+  );
+}
+
+/** Rentabilidade contratada e vencimento de um investimento de renda fixa. */
+function RateFields({
+  rateType,
+  onRateTypeChange,
+  rateValue,
+  onRateValueChange,
+  maturityDate,
+  onMaturityDateChange,
+  error,
+}: {
+  rateType: RateType;
+  onRateTypeChange: (t: RateType) => void;
+  rateValue: string;
+  onRateValueChange: (v: string) => void;
+  maturityDate: string;
+  onMaturityDateChange: (v: string) => void;
+  error?: string;
+}) {
+  return (
+    <>
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-2 font-medium text-ink">Rentabilidade contratada</legend>
+        <div className="flex flex-wrap gap-2">
+          {(Object.keys(RATE_TYPE_LABEL) as RateType[]).map((t) => (
+            <Chip key={t} selected={rateType === t} onClick={() => onRateTypeChange(t)}>
+              {RATE_TYPE_LABEL[t]}
+            </Chip>
+          ))}
+        </div>
+      </fieldset>
+      <div className="grid grid-cols-2 gap-4">
+        <TextField
+          label={`Taxa (${RATE_SUFFIX[rateType]})`}
+          inputMode="decimal"
+          placeholder={RATE_PLACEHOLDER[rateType]}
+          value={rateValue}
+          onChange={(e) => onRateValueChange(e.target.value)}
+          error={error}
+        />
+        <TextField
+          label="Vencimento (opcional)"
+          type="date"
+          value={maturityDate}
+          onChange={(e) => onMaturityDateChange(e.target.value)}
+        />
+      </div>
+    </>
+  );
+}
+
+/** "110" -> "110"; 12.5 -> "12,5" para preencher o campo de taxa */
+const rateInput = (value?: number | null) => (value ? String(value).replace(".", ",") : "");
+
+/**
+ * Edita onde o investimento está, o nome e, na renda fixa, taxa e vencimento.
+ * Ticker e tipo ficam como estão: mudar isso afetaria os aportes já registrados.
+ */
+export function EditInvestmentForm({
+  holding,
+  preferredInstitutions = [],
+  onSubmit,
+}: {
+  holding: Investment & { amountBased: boolean };
+  preferredInstitutions?: string[];
+  onSubmit: (investment: InvestmentRequest) => Promise<void>;
+}) {
+  const [institution, setInstitution] = useState(holding.institution ?? "");
+  const [assetName, setAssetName] = useState(holding.assetName);
+  const [rateType, setRateType] = useState<RateType>(holding.rateType ?? "CDI_PERCENT");
+  const [rateValue, setRateValue] = useState(rateInput(holding.rateValue));
+  const [maturityDate, setMaturityDate] = useState(holding.maturityDate ?? "");
+  const [submitted, setSubmitted] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string>();
+  const isFixed = holding.assetType === "FIXED_INCOME" && holding.amountBased;
+  const options = [...new Set([...preferredInstitutions, ...INSTITUTIONS])];
+
+  function validate() {
+    const errors: InvestmentErrors = {};
+    if (!institution.trim()) errors.institution = "Escolha onde está esse investimento";
+    if (!assetName.trim()) errors.assetName = "Informe um nome";
+    if (isFixed && rateValue.trim() && !(parseDecimal(rateValue) > 0)) errors.rateValue = "Informe uma taxa maior que zero";
+    return errors;
+  }
+  const errors = submitted ? validate() : {};
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitted(true);
+    if (Object.keys(validate()).length > 0) return;
+    setSaving(true);
+    setError(undefined);
+    const rate = parseDecimal(rateValue);
+    try {
+      await onSubmit({
+        ticker: holding.ticker,
+        assetType: holding.assetType,
+        assetName: assetName.trim(),
+        institution: institution.trim(),
+        // Fora da renda fixa, mantém o que já estava salvo
+        ...(isFixed
+          ? { ...(rate > 0 ? { rateType, rateValue: rate } : {}), ...(maturityDate ? { maturityDate } : {}) }
+          : {
+              ...(holding.rateType && holding.rateValue ? { rateType: holding.rateType, rateValue: holding.rateValue } : {}),
+              ...(holding.maturityDate ? { maturityDate: holding.maturityDate } : {}),
+            }),
+      });
+    } catch (e) {
+      setError(apiErrorMessage(e, "Não foi possível salvar. Tente de novo."));
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
+      <InstitutionField value={institution} onChange={setInstitution} options={options} error={errors.institution} />
+      <TextField label="Nome" maxLength={255} value={assetName} onChange={(e) => setAssetName(e.target.value)} error={errors.assetName} />
+      {isFixed && (
+        <RateFields
+          rateType={rateType}
+          onRateTypeChange={setRateType}
+          rateValue={rateValue}
+          onRateValueChange={setRateValue}
+          maturityDate={maturityDate}
+          onMaturityDateChange={setMaturityDate}
+          error={errors.rateValue}
+        />
+      )}
+      <SubmitError message={error} />
+      <PrimaryButton type="submit" disabled={saving}>
+        {saving ? "Salvando..." : "Salvar alterações"}
+      </PrimaryButton>
+    </form>
+  );
+}
+
 /** O que a pessoa está cadastrando; decide quais campos aparecem. */
 type Kind = "market" | "fixed" | "fund";
 
@@ -274,8 +467,11 @@ type InvestmentErrors = Partial<Record<"institution" | "ticker" | "assetName" | 
 export function InvestmentForm({
   preferredInstitutions = [],
   initialInstitution = "",
+  initialAsset,
   onSubmit,
 }: {
+  /** Vindo das recomendações: ticker, nome, tipo e preço já preenchidos */
+  initialAsset?: { ticker: string; assetName: string; assetType: AssetType; currentPrice?: number };
   /** Instituições que a pessoa já usa (cadastro e carteira), mostradas primeiro */
   preferredInstitutions?: string[];
   /** Já vem marcada (ex.: "Adicionar no BTG Pactual") */
@@ -284,15 +480,18 @@ export function InvestmentForm({
 }) {
   const [catalog, setCatalog] = useState<Asset[]>([]);
   const [institution, setInstitution] = useState(initialInstitution);
-  const [otherInstitution, setOtherInstitution] = useState(false);
   const [kind, setKind] = useState<Kind>("market");
-  const [ticker, setTicker] = useState("");
-  const [assetName, setAssetName] = useState("");
-  const [assetType, setAssetType] = useState<AssetType>();
+  const [ticker, setTicker] = useState(initialAsset?.ticker ?? "");
+  const [assetName, setAssetName] = useState(initialAsset?.assetName ?? "");
+  const [assetType, setAssetType] = useState<AssetType | undefined>(initialAsset?.assetType);
   const [rateType, setRateType] = useState<RateType>("CDI_PERCENT");
   const [rateValue, setRateValue] = useState("");
   const [maturityDate, setMaturityDate] = useState("");
-  const [values, setValues] = useState<ContributionValues>({ quantity: "", unitPrice: "", date: todayISO() });
+  const [values, setValues] = useState<ContributionValues>({
+    quantity: "",
+    unitPrice: priceInput(initialAsset?.currentPrice),
+    date: todayISO(),
+  });
   const [amount, setAmount] = useState<AmountValues>({ amount: "", date: todayISO() });
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -368,44 +567,7 @@ export function InvestmentForm({
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
-      <fieldset className="flex flex-col gap-2">
-        <legend className="mb-2 font-medium text-ink">Onde está esse investimento?</legend>
-        <div className="flex flex-wrap gap-2">
-          {institutionOptions.map((name) => (
-            <Chip
-              key={name}
-              selected={!otherInstitution && institution === name}
-              onClick={() => {
-                setOtherInstitution(false);
-                setInstitution(name);
-              }}
-            >
-              {name}
-            </Chip>
-          ))}
-          <Chip
-            selected={otherInstitution}
-            onClick={() => {
-              setOtherInstitution(true);
-              setInstitution("");
-            }}
-          >
-            Outra
-          </Chip>
-        </div>
-        {otherInstitution && (
-          <div className="mt-2">
-            <TextField
-              label="Nome da instituição"
-              placeholder="Banco, corretora..."
-              maxLength={60}
-              value={institution}
-              onChange={(e) => setInstitution(e.target.value)}
-            />
-          </div>
-        )}
-        {errors.institution && <span className="text-sm text-aggressive">{errors.institution}</span>}
-      </fieldset>
+      <InstitutionField value={institution} onChange={setInstitution} options={institutionOptions} error={errors.institution} />
 
       <fieldset className="flex flex-col gap-2">
         <legend className="mb-2 font-medium text-ink">O que é?</legend>
@@ -471,32 +633,15 @@ export function InvestmentForm({
             onChange={(e) => setAssetName(e.target.value)}
             error={errors.assetName}
           />
-          <fieldset className="flex flex-col gap-2">
-            <legend className="mb-2 font-medium text-ink">Rentabilidade contratada</legend>
-            <div className="flex flex-wrap gap-2">
-              {(Object.keys(RATE_TYPE_LABEL) as RateType[]).map((t) => (
-                <Chip key={t} selected={rateType === t} onClick={() => setRateType(t)}>
-                  {RATE_TYPE_LABEL[t]}
-                </Chip>
-              ))}
-            </div>
-          </fieldset>
-          <div className="grid grid-cols-2 gap-4">
-            <TextField
-              label={`Taxa (${RATE_SUFFIX[rateType]})`}
-              inputMode="decimal"
-              placeholder={RATE_PLACEHOLDER[rateType]}
-              value={rateValue}
-              onChange={(e) => setRateValue(e.target.value)}
-              error={errors.rateValue}
-            />
-            <TextField
-              label="Vencimento (opcional)"
-              type="date"
-              value={maturityDate}
-              onChange={(e) => setMaturityDate(e.target.value)}
-            />
-          </div>
+          <RateFields
+            rateType={rateType}
+            onRateTypeChange={setRateType}
+            rateValue={rateValue}
+            onRateValueChange={setRateValue}
+            maturityDate={maturityDate}
+            onMaturityDateChange={setMaturityDate}
+            error={errors.rateValue}
+          />
           <p className="-mt-2 text-sm text-muted">Com a taxa, estimamos quanto o investimento rendeu até hoje.</p>
 
           <h3 className="mt-2 text-sm font-semibold uppercase tracking-[0.1em] text-muted">Aplicação</h3>

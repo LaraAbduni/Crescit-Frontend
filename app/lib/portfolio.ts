@@ -1,5 +1,5 @@
 import { ApiError, portfolioApi } from "./api";
-import { estimateValue, type RateType } from "./fixed-income";
+import { estimateNetValue, estimateValue, isTaxExempt, type RateType } from "./fixed-income";
 import { todayISO } from "./format";
 import { NO_INSTITUTION } from "./institutions";
 import { getAssets, type AssetType } from "./recommendations";
@@ -95,6 +95,11 @@ export async function addContribution(
   return portfolioApi("POST", `${base(userId)}/investments/${investmentId}/contributions`, req);
 }
 
+/** Atualiza nome, instituição e rentabilidade (o backend recebe o InvestmentRequest completo). */
+export async function updateInvestment(userId: string, investmentId: string, req: InvestmentRequest): Promise<Investment> {
+  return portfolioApi("PUT", `${base(userId)}/investments/${investmentId}`, req);
+}
+
 /** Remove o ativo e todos os aportes dele. */
 export async function deleteInvestment(userId: string, investmentId: string): Promise<void> {
   return portfolioApi("DELETE", `${base(userId)}/investments/${investmentId}`);
@@ -121,6 +126,9 @@ export interface Holding extends Investment {
   currentPrice?: number;
   currentValue: number;
   valuation: Valuation;
+  /** Renda fixa estimada: valor depois do IR (igual ao bruto se for isenta) */
+  netValue?: number;
+  taxExempt?: boolean;
   /** Renda fixa e fundos cadastrados por valor aplicado, sem cotação no catálogo */
   amountBased: boolean;
   gain: number;
@@ -179,12 +187,15 @@ export async function loadPortfolio(userId: string): Promise<PortfolioSummary> {
     const currentPrice = prices.get(inv.ticker);
     let valuation: Valuation = "invested";
     let currentValue = inv.totalInvested;
+    let netValue: number | undefined;
+    const taxExempt = isTaxExempt(inv.assetName);
     if (currentPrice !== undefined) {
       valuation = "market";
       currentValue = inv.totalQuantity * currentPrice;
     } else if (inv.rateType && inv.rateValue) {
       valuation = "estimated";
       currentValue = estimateValue(contributions[idx], inv.rateType, inv.rateValue, today);
+      netValue = estimateNetValue(contributions[idx], inv.rateType, inv.rateValue, today, taxExempt);
     }
     const gain = currentValue - inv.totalInvested;
     return {
@@ -193,6 +204,8 @@ export async function loadPortfolio(userId: string): Promise<PortfolioSummary> {
       currentPrice,
       currentValue,
       valuation,
+      netValue,
+      taxExempt,
       amountBased: isAmountBased(inv.assetType, currentPrice !== undefined),
       gain,
       gainPct: valuation !== "invested" && inv.totalInvested > 0 ? gain / inv.totalInvested : null,

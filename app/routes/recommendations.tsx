@@ -2,12 +2,17 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import type { Route } from "./+types/recommendations";
 import { PROFILE_TEXT_COLOR } from "~/components/profile-gauge";
-import { RecommendationCard, type AddState } from "~/components/recommendation-card";
+import { RecommendationCard } from "~/components/recommendation-card";
+import { InvestmentForm } from "~/components/portfolio-forms";
+import { Sheet } from "~/components/sheet";
 import { useToast } from "~/components/toast";
 import { Chip, PageTitle } from "~/components/ui";
 import { useOnboarding } from "~/lib/onboarding";
 import { apiErrorMessage } from "~/lib/api";
-import { addInvestment, listInvestments } from "~/lib/portfolio";
+import { rankRecommendations, type RankedRecommendation } from "~/lib/analysis";
+import { NO_INSTITUTION } from "~/lib/institutions";
+import { addContribution, addInvestment } from "~/lib/portfolio";
+import { usePortfolio } from "~/lib/use-portfolio";
 import { INVESTOR_TYPES } from "~/lib/profile";
 import {
   ASSET_TYPE_LABEL,
@@ -30,25 +35,18 @@ type Load =
 
 export default function Recommendations() {
   // O layout só renderiza esta tela quando o perfil já existe
-  const { profile } = useOnboarding();
+  const { profile, context } = useOnboarding();
   const { userId, investorType } = profile!;
 
   const [load, setLoad] = useState<Load>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
   const [filter, setFilter] = useState<AssetType | "ALL">("ALL");
-  const [adding, setAdding] = useState<Record<string, AddState>>({});
-  const [ownedTickers, setOwnedTickers] = useState<string[]>([]);
+  const [adding, setAdding] = useState<Recommendation | null>(null);
+  const { load: portfolio, reload: reloadPortfolio } = usePortfolio(userId);
   const toast = useToast();
   // Vindo do Início (?ativo=PETR4), o card do ativo é rolado até a tela e destacado
   const [params] = useSearchParams();
   const focused = params.get("ativo");
-
-  // Ativos que já estão na carteira aparecem como "Na carteira"
-  useEffect(() => {
-    listInvestments(userId)
-      .then((list) => setOwnedTickers(list.map((i) => i.ticker)))
-      .catch(() => {});
-  }, [userId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,24 +60,35 @@ export default function Recommendations() {
   }, [userId, investorType, attempt]);
 
   useEffect(() => {
-    if (load.status !== "done" || !focused) return;
+    if (load.status !== "done" || portfolio.status === "loading" || !focused) return;
     document.getElementById(`ativo-${focused}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [load.status, focused]);
+  }, [load.status, portfolio.status, focused]);
 
-  async function handleAdd(item: Recommendation) {
-    setAdding((s) => ({ ...s, [item.ticker]: "loading" }));
-    try {
-      await addInvestment(userId, { ticker: item.ticker, assetName: item.assetName, assetType: item.assetType });
-      setOwnedTickers((t) => [...t, item.ticker]);
-      setAdding((s) => ({ ...s, [item.ticker]: "idle" }));
-      toast(`${item.ticker} adicionado à carteira`);
-    } catch {
-      setAdding((s) => ({ ...s, [item.ticker]: "error" }));
-    }
-  }
+  // Ativos que já estão na carteira aparecem como "Na carteira" e vão para o fim
+  const summary = portfolio.status === "done" ? portfolio.summary : null;
+  const ownedTickers = summary?.holdings.map((h) => h.ticker) ?? [];
+  const preferredInstitutions = [
+    ...(summary?.byInstitution.map((i) => i.institution) ?? []),
+    ...(context?.banks ?? []),
+  ].filter((name) => !["Nenhuma", "Outro", NO_INSTITUTION].includes(name));
 
   const visible =
     load.status === "done" ? load.items.filter((r) => filter === "ALL" || r.assetType === filter) : [];
+  const ranked = rankRecommendations(visible, summary, investorType, ownedTickers);
+  const balancing = ranked.filter((r) => r.balances);
+  const others = ranked.filter((r) => !r.balances);
+
+  const renderCard = (r: RankedRecommendation<Recommendation>) => (
+    <RecommendationCard
+      key={r.item.id}
+      item={r.item}
+      reason={r.reason}
+      balances={r.balances}
+      highlighted={r.item.ticker === focused}
+      addState={r.owned ? "added" : "idle"}
+      onAdd={() => setAdding(r.item)}
+    />
+  );
 
   return (
     <>
@@ -101,7 +110,7 @@ export default function Recommendations() {
       </div>
 
       <section className="mt-6 grid gap-5 md:grid-cols-2" aria-live="polite">
-        {load.status === "loading" && [0, 1, 2].map((i) => <CardSkeleton key={i} />)}
+        {(load.status === "loading" || portfolio.status === "loading") && [0, 1, 2].map((i) => <CardSkeleton key={i} />)}
 
         {load.status === "error" && (
           <div className="rounded-3xl border border-line bg-white p-6 text-center md:col-span-2">
@@ -124,17 +133,49 @@ export default function Recommendations() {
           </p>
         )}
 
-        {visible.map((item) => (
-          <RecommendationCard
-            key={item.id}
-            item={item}
-            highlighted={item.ticker === focused}
-            addState={ownedTickers.includes(item.ticker) ? "added" : (adding[item.ticker] ?? "idle")}
-            onAdd={() => handleAdd(item)}
-          />
-        ))}
+        {portfolio.status !== "loading" && balancing.length > 0 && (
+          <>
+            <SectionTitle
+              title="Para equilibrar sua carteira"
+              text="Tipos de ativo abaixo da referência do seu perfil. Veja a comparação completa na Análise."
+            />
+            {balancing.map(renderCard)}
+          </>
+        )}
+
+        {portfolio.status !== "loading" && others.length > 0 && (
+          <>
+            {balancing.length > 0 && <SectionTitle title="Outras opções para o seu perfil" />}
+            {others.map(renderCard)}
+          </>
+        )}
       </section>
+
+      {adding && (
+        <Sheet title={`Adicionar ${adding.ticker}`} onClose={() => setAdding(null)}>
+          <InvestmentForm
+            initialAsset={adding}
+            preferredInstitutions={preferredInstitutions}
+            onSubmit={async (investment, contribution) => {
+              const created = await addInvestment(userId, investment);
+              await addContribution(userId, created.id, contribution);
+              await reloadPortfolio();
+              setAdding(null);
+              toast(`${created.ticker} adicionado à carteira`);
+            }}
+          />
+        </Sheet>
+      )}
     </>
+  );
+}
+
+function SectionTitle({ title, text }: { title: string; text?: string }) {
+  return (
+    <div className="mt-2 md:col-span-2">
+      <h2 className="text-xl font-semibold text-ink">{title}</h2>
+      {text && <p className="mt-1 text-muted">{text}</p>}
+    </div>
   );
 }
 

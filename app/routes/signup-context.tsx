@@ -62,7 +62,7 @@ export default function SignupContext() {
       <Eyebrow>Seu contexto</Eyebrow>
       <Title>{firstName ? `${firstName}, onde você tem conta hoje?` : "Onde você tem conta hoje?"}</Title>
       <p className="mt-3 text-muted">Bancos e corretoras. Pode marcar mais de um.</p>
-      <p className="mt-2 text-sm text-muted">Essas preferências ficam apenas nesta sessão.</p>
+      <p className="mt-2 text-sm text-muted">Essas preferências ficam salvas neste navegador.</p>
 
       <div className="mt-6 flex flex-wrap gap-2">
         {BANKS.map((bank) => (

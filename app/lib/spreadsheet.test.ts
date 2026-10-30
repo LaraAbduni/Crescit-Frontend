@@ -32,7 +32,7 @@ describe("planilha da carteira", () => {
 
   it("mostra renda fixa pelo nome, com taxa e sem quantidade", () => {
     const [, row] = sheets[1].data;
-    expect(row.slice(0, 7)).toEqual(["CDB Inter", null, "Renda Fixa", "Inter", "110% do CDI", expect.objectContaining({ format: "dd/mm/yyyy" }), null]);
+    expect(row.slice(0, 7)).toEqual(["CDB Inter", null, "Renda fixa", "Inter", "110% do CDI", expect.objectContaining({ format: "dd/mm/yyyy" }), null]);
   });
 
   it("guarda datas ao meio-dia UTC para não mudar o dia", () => {

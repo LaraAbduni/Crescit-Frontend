@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import type { Route } from "./+types/portfolio";
-import { ConfirmRemoval, ContributionForm, InvestmentForm } from "~/components/portfolio-forms";
+import { ConfirmRemoval, ContributionForm, EditInvestmentForm, InvestmentForm } from "~/components/portfolio-forms";
 import { Sheet } from "~/components/sheet";
 import { useToast } from "~/components/toast";
 import { Trend } from "~/components/trend";
@@ -14,6 +14,7 @@ import {
   addInvestment,
   deleteContribution,
   deleteInvestment,
+  updateInvestment,
   displayName,
   institutionOf,
   ALLOCATION_ORDER,
@@ -31,6 +32,7 @@ export function meta({}: Route.MetaArgs) {
 type SheetState =
   | { kind: "investment" }
   | { kind: "contribution"; holding: Holding }
+  | { kind: "edit"; holding: Holding }
   | { kind: "removeInvestment"; holding: Holding }
   | { kind: "removeContribution"; holding: Holding; contribution: Contribution }
   | null;
@@ -156,6 +158,9 @@ export default function Portfolio() {
                         {g.share > 0 && <span className="ml-2 text-muted tabular-nums">{pct(g.share)}</span>}
                       </span>
                     </div>
+                    {g.key === "Sem instituição" && (
+                      <p className="mt-1 px-1 text-sm text-muted">Abra o investimento e toque em Editar para indicar o banco ou a corretora.</p>
+                    )}
                     <ul className="mt-3 flex flex-col gap-3">
                       {g.holdings.map((h) => (
                         <li key={h.id}>
@@ -165,6 +170,7 @@ export default function Portfolio() {
                             open={expanded.includes(h.id)}
                             onToggle={() => toggle(h.id)}
                             onNewContribution={() => setSheet({ kind: "contribution", holding: h })}
+                            onEdit={() => setSheet({ kind: "edit", holding: h })}
                             onRemove={() => setSheet({ kind: "removeInvestment", holding: h })}
                             onRemoveContribution={(c) => setSheet({ kind: "removeContribution", holding: h, contribution: c })}
                           />
@@ -206,6 +212,21 @@ export default function Portfolio() {
               await reload();
               setSheet(null);
               toast(`Aporte em ${displayName(sheet.holding)} registrado`);
+            }}
+          />
+        </Sheet>
+      )}
+
+      {sheet?.kind === "edit" && (
+        <Sheet title={`Editar ${displayName(sheet.holding)}`} onClose={() => setSheet(null)}>
+          <EditInvestmentForm
+            holding={sheet.holding}
+            preferredInstitutions={preferredInstitutions}
+            onSubmit={async (req) => {
+              await updateInvestment(userId, sheet.holding.id, req);
+              await reload();
+              setSheet(null);
+              toast("Alterações salvas");
             }}
           />
         </Sheet>
@@ -262,6 +283,7 @@ function HoldingCard({
   open,
   onToggle,
   onNewContribution,
+  onEdit,
   onRemove,
   onRemoveContribution,
 }: {
@@ -270,6 +292,7 @@ function HoldingCard({
   open: boolean;
   onToggle: () => void;
   onNewContribution: () => void;
+  onEdit: () => void;
   onRemove: () => void;
   onRemoveContribution: (c: Contribution) => void;
 }) {
@@ -326,6 +349,18 @@ function HoldingCard({
 
       {open && (
         <div id={panelId} className="border-t border-line bg-cream/60 px-5 pt-5 pb-6">
+          {h.netValue !== undefined && (
+            <p className="mb-4 rounded-xl bg-white px-4 py-3 text-[0.95rem] text-ink">
+              {h.taxExempt ? (
+                <>Isento de IR: o valor estimado de <strong>{money(h.netValue)}</strong> já é líquido.</>
+              ) : (
+                <>
+                  Valor líquido estimado, depois do IR: <strong>{money(h.netValue)}</strong>{" "}
+                  <span className="text-muted">({money(h.currentValue - h.netValue)} de imposto)</span>
+                </>
+              )}
+            </p>
+          )}
           <h3 className="text-sm font-semibold uppercase tracking-[0.1em] text-muted">Histórico de aportes</h3>
           {h.contributions.length === 0 ? (
             <p className="mt-3 text-muted">Registre o primeiro aporte deste ativo.</p>
@@ -360,9 +395,14 @@ function HoldingCard({
             >
               <PlusIcon /> Novo aporte
             </button>
-            <button type="button" onClick={onRemove} className="font-semibold text-[#b4472f] hover:underline">
-              Remover ativo
-            </button>
+            <span className="flex items-center gap-5">
+              <button type="button" onClick={onEdit} className="font-semibold text-brand hover:underline">
+                Editar
+              </button>
+              <button type="button" onClick={onRemove} className="font-semibold text-[#b4472f] hover:underline">
+                Remover ativo
+              </button>
+            </span>
           </div>
         </div>
       )}

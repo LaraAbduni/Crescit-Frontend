@@ -31,7 +31,10 @@ export default function ProfileResult() {
               <TextButton onClick={() => navigate("/recomendacoes")}>Ver minhas recomendações</TextButton>
             </>
           ) : (
-            <PrimaryButton onClick={() => navigate("/recomendacoes")}>Ver minhas recomendações</PrimaryButton>
+            <>
+              <PrimaryButton onClick={() => navigate("/primeiros-passos")}>Montar meu plano para começar</PrimaryButton>
+              <TextButton onClick={() => navigate("/recomendacoes")}>Ver minhas recomendações</TextButton>
+            </>
           )}
           <TextButton onClick={() => navigate("/perfil/questionario?pergunta=1")}>Refazer questionário</TextButton>
         </>

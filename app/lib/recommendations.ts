@@ -26,7 +26,7 @@ export const ASSET_TYPE_LABEL: Record<AssetType, string> = {
   STOCK: "Ação",
   FII: "FII",
   ETF: "ETF",
-  FIXED_INCOME: "Renda Fixa",
+  FIXED_INCOME: "Renda fixa",
   FUND: "Fundo",
 };
 

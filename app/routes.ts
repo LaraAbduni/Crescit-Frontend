@@ -13,6 +13,7 @@ export default [
       route("recomendacoes", "routes/recommendations.tsx"),
       route("carteira", "routes/portfolio.tsx"),
       route("analise", "routes/analysis.tsx"),
+      route("primeiros-passos", "routes/first-steps.tsx"),
     ]),
   ]),
 ] satisfies RouteConfig;
