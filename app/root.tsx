@@ -8,6 +8,7 @@ import {
 } from "react-router";
 
 import type { Route } from "./+types/root";
+import { ToastProvider } from "./components/toast";
 import { OnboardingProvider } from "./lib/onboarding";
 import { AuthProvider } from "./lib/auth";
 import "./app.css";
@@ -49,7 +50,9 @@ export default function App() {
   return (
     <AuthProvider>
       <OnboardingProvider>
-        <Outlet />
+        <ToastProvider>
+          <Outlet />
+        </ToastProvider>
       </OnboardingProvider>
     </AuthProvider>
   );

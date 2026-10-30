@@ -37,6 +37,32 @@ describe("contratos entre telas e serviços", () => {
     expect(summary.recentContributions[0]).toMatchObject({ ticker: "BOVA11", amount: 200 });
     expect(fetchMock.mock.calls.every(([, options]) => options.headers.Authorization === "Bearer access-token")).toBe(true);
   });
+  it("agrupa por instituição e estima a renda fixa pela taxa contratada", async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.endsWith("/assets")) return Response.json([{ ticker: "BOVA11", currentPrice: 100 }]);
+      if (url.includes("/investments/cdb/contributions")) return Response.json([{ id: "c1", quantity: 1, unitPrice: 1000, amount: 1000, contributionDate: "2026-10-01", createdAt: "2026-10-01T12:00:00" }]);
+      if (url.endsWith("/contributions")) return Response.json([]);
+      return Response.json([
+        { id: "cdb", ticker: "RF-ABC123", assetName: "CDB Inter", assetType: "FIXED_INCOME", institution: "Inter", rateType: "PREFIXED", rateValue: 12, totalQuantity: 1, totalInvested: 1000 },
+        { id: "fundo", ticker: "FD-XYZ789", assetName: "Fundo XP", assetType: "FUND", institution: "XP", totalQuantity: 1, totalInvested: 3000 },
+        { id: "bova", ticker: "BOVA11", assetName: "Índice", assetType: "ETF", institution: "XP", totalQuantity: 10, totalInvested: 900 },
+        { id: "antigo", ticker: "ITUB4", assetName: "Itaú", assetType: "STOCK", totalQuantity: 0, totalInvested: 0 },
+      ]);
+    });
+    const summary = await loadPortfolio(userId);
+    const cdb = summary.holdings.find((h) => h.id === "cdb")!;
+    expect(cdb).toMatchObject({ valuation: "estimated", amountBased: true });
+    expect(cdb.currentValue).toBeGreaterThan(1000);
+    expect(summary.holdings.find((h) => h.id === "fundo")).toMatchObject({ valuation: "invested", amountBased: true, currentValue: 3000 });
+    expect(summary.holdings.find((h) => h.id === "bova")).toMatchObject({ valuation: "market", amountBased: false, currentValue: 1000 });
+    expect(summary.byInstitution.map((i) => [i.institution, i.value, i.count])).toEqual([
+      ["XP", 4000, 2],
+      ["Inter", cdb.currentValue, 1],
+      ["Sem instituição", 0, 1],
+    ]);
+    expect(summary).toMatchObject({ hasEstimates: true, hasMissingPrices: true });
+    expect(summary.allocation.map((a) => a.type)).toEqual(["FIXED_INCOME", "FUND", "ETF"]);
+  });
   it("não apresenta rendimento fictício quando o catálogo está indisponível", async () => {
     fetchMock.mockImplementation(async (url: string) => {
       if (url.endsWith("/assets")) throw new TypeError("offline");

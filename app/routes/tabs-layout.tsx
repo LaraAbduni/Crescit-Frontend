@@ -1,7 +1,6 @@
 import { Navigate, NavLink, Outlet } from "react-router";
 import { useAuth0 } from "@auth0/auth0-react";
 import { useState } from "react";
-import { ToastProvider } from "~/components/toast";
 import { Logo } from "~/components/ui";
 import { useOnboarding } from "~/lib/onboarding";
 
@@ -9,6 +8,7 @@ const TABS = [
   { to: "/inicio", label: "Início", icon: HomeIcon },
   { to: "/recomendacoes", label: "Recomendações", icon: CompassIcon },
   { to: "/carteira", label: "Carteira", icon: BriefcaseIcon },
+  { to: "/analise", label: "Análise", icon: ChartIcon },
 ];
 
 /** Telas principais do app (depois do onboarding): navegação inferior no celular e lateral no computador. */
@@ -27,7 +27,7 @@ export default function TabsLayout() {
   const userLabel = account?.email || account?.name;
 
   return (
-    <ToastProvider>
+    <>
       <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-line bg-white px-5 py-8 lg:flex">
         <Logo className="px-3" />
         <nav className="mt-10" aria-label="Principal">
@@ -67,13 +67,13 @@ export default function TabsLayout() {
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 border-t border-line bg-white lg:hidden">
-        <ul className="mx-auto grid max-w-md grid-cols-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <ul className="mx-auto grid max-w-md grid-cols-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           {TABS.map(({ to, label, icon: Icon }) => (
             <li key={to}>
               <NavLink
                 to={to}
                 className={({ isActive }) =>
-                  `flex flex-col items-center gap-1 text-[0.95rem] ${isActive ? "font-semibold text-brand" : "text-muted"}`
+                  `flex flex-col items-center gap-1 text-[0.8rem] min-[400px]:text-[0.9rem] ${isActive ? "font-semibold text-brand" : "text-muted"}`
                 }
               >
                 <Icon />
@@ -83,7 +83,7 @@ export default function TabsLayout() {
           ))}
         </ul>
       </nav>
-    </ToastProvider>
+    </>
   );
 }
 
@@ -110,6 +110,15 @@ function CompassIcon({ size = 28 }: { size?: number }) {
     <svg {...iconProps} width={size} height={size}>
       <circle cx="12" cy="12" r="8.5" />
       <path d="M15.5 8.5l-2 5-5 2 2-5z" />
+    </svg>
+  );
+}
+
+function ChartIcon({ size = 28 }: { size?: number }) {
+  return (
+    <svg {...iconProps} width={size} height={size}>
+      <path d="M4 20h16" />
+      <path d="M7 16v-4M12 16V8M17 16v-7" />
     </svg>
   );
 }

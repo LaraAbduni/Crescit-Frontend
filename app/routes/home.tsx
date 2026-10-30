@@ -3,10 +3,11 @@ import { Link } from "react-router";
 import type { Route } from "./+types/home";
 import { AllocationDonut } from "~/components/allocation-donut";
 import { EvolutionChart } from "~/components/evolution-chart";
+import { InstitutionBars } from "~/components/institution-bars";
 import { Trend } from "~/components/trend";
 import { dateBR, money, qty } from "~/lib/format";
 import { useOnboarding } from "~/lib/onboarding";
-import { unitLabel } from "~/lib/portfolio";
+import { displayName, unitLabel } from "~/lib/portfolio";
 import { INVESTOR_TYPES, type InvestorType } from "~/lib/profile";
 import { ASSET_TYPE_LABEL, getRecommendations, RISK_LABEL, type Recommendation } from "~/lib/recommendations";
 import { usePortfolio } from "~/lib/use-portfolio";
@@ -106,6 +107,21 @@ export default function Home() {
           </Card>
         )}
 
+        {summary && summary.byInstitution.length > 0 && summary.currentValue > 0 && (
+          <Card
+            title="Por instituição"
+            action={
+              <Link to="/carteira" className="shrink-0 font-semibold text-brand hover:underline">
+                Ver detalhes
+              </Link>
+            }
+          >
+            <div className="mt-4">
+              <InstitutionBars data={summary.byInstitution.filter((i) => i.value > 0)} />
+            </div>
+          </Card>
+        )}
+
         {summary && summary.holdings.length === 0 && (
           <Card title="Comece sua carteira">
             <p className="mt-2 text-muted">
@@ -168,7 +184,8 @@ export default function Home() {
                 <li key={c.id} className="flex items-baseline gap-2.5 text-[0.95rem]">
                   <span className="w-10 shrink-0 text-muted tabular-nums">{dateBR(c.contributionDate, false)}</span>
                   <span className="min-w-0 flex-1 text-ink">
-                    {c.ticker} · {qty(c.quantity)} {unitLabel(c.assetType, c.quantity)}
+                    {displayName(c)}
+                    {!c.amountBased && ` · ${qty(c.quantity)} ${unitLabel(c.assetType, c.quantity)}`}
                   </span>
                   <span className="shrink-0 font-semibold text-ink tabular-nums">{money(c.amount)}</span>
                 </li>

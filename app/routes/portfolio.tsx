@@ -5,18 +5,23 @@ import { ConfirmRemoval, ContributionForm, InvestmentForm } from "~/components/p
 import { Sheet } from "~/components/sheet";
 import { useToast } from "~/components/toast";
 import { Trend } from "~/components/trend";
-import { PageTitle } from "~/components/ui";
-import { dateBR, money, qty } from "~/lib/format";
+import { Chip, PageTitle } from "~/components/ui";
+import { CDI_REFERENCE, rateLabel } from "~/lib/fixed-income";
+import { dateBR, money, pct, qty } from "~/lib/format";
 import { useOnboarding } from "~/lib/onboarding";
 import {
   addContribution,
   addInvestment,
   deleteContribution,
   deleteInvestment,
+  displayName,
+  institutionOf,
+  ALLOCATION_ORDER,
   unitLabel,
   type Contribution,
   type Holding,
 } from "~/lib/portfolio";
+import { ASSET_TYPE_LABEL } from "~/lib/recommendations";
 import { usePortfolio } from "~/lib/use-portfolio";
 
 export function meta({}: Route.MetaArgs) {
@@ -30,13 +35,47 @@ type SheetState =
   | { kind: "removeContribution"; holding: Holding; contribution: Contribution }
   | null;
 
+type GroupBy = "institution" | "type";
+
 export default function Portfolio() {
-  const { profile } = useOnboarding();
+  const { profile, context } = useOnboarding();
   const userId = profile!.userId;
   const { load, reload, retry } = usePortfolio(userId);
   const [expanded, setExpanded] = useState<string[]>([]);
   const [sheet, setSheet] = useState<SheetState>(null);
+  const [groupBy, setGroupBy] = useState<GroupBy>("institution");
   const toast = useToast();
+
+  // Instituições já usadas na carteira e as marcadas no cadastro aparecem primeiro no formulário
+  const preferredInstitutions = [
+    ...(load.status === "done" ? load.summary.byInstitution.map((i) => i.institution) : []),
+    ...(context?.banks ?? []),
+  ].filter((name) => name !== "Nenhuma" && name !== "Outro" && name !== "Sem instituição");
+
+  const groups =
+    load.status !== "done"
+      ? []
+      : groupBy === "institution"
+        ? load.summary.byInstitution.map((g) => ({
+            key: g.institution,
+            label: g.institution,
+            value: g.value,
+            share: g.share,
+            holdings: load.summary.holdings.filter((h) => institutionOf(h) === g.institution),
+          }))
+        : load.summary.allocation.map((g) => ({
+            key: g.type,
+            label: ASSET_TYPE_LABEL[g.type],
+            value: g.value,
+            share: g.share,
+            holdings: load.summary.holdings.filter((h) => h.assetType === g.type),
+          }));
+  // Ativos com valor zero (sem aportes) não entram na distribuição por tipo; ficam num grupo à parte
+  const ungrouped =
+    load.status === "done" && groupBy === "type"
+      ? load.summary.holdings.filter((h) => !groups.some((g) => g.holdings.includes(h)))
+      : [];
+  if (ungrouped.length > 0) groups.push({ key: "other", label: "Sem aportes", value: 0, share: 0, holdings: ungrouped });
 
   const toggle = (id: string) => setExpanded((e) => (e.includes(id) ? e.filter((x) => x !== id) : [...e, id]));
 
@@ -77,8 +116,13 @@ export default function Portfolio() {
                   <span className="text-muted">Investido {money(load.summary.totalInvested)}</span>
                 </p>
               </section>
-              <p className="mt-3 text-sm text-muted">Os valores usam os preços cadastrados no catálogo, sem cotação em tempo real.</p>
-              {load.summary.hasMissingPrices && <p role="status" className="mt-2 text-sm text-muted">Alguns ativos estão sem preço disponível. Para eles, mostramos o valor investido.</p>}
+              <p className="mt-3 text-sm text-muted">Ações, FIIs e ETFs usam os preços cadastrados no catálogo, sem cotação em tempo real.</p>
+              {load.summary.hasEstimates && (
+                <p className="mt-2 text-sm text-muted">
+                  Renda fixa: valor bruto estimado pela taxa contratada, com CDI de referência de {pct(CDI_REFERENCE)} ao ano.
+                </p>
+              )}
+              {load.summary.hasMissingPrices && <p role="status" className="mt-2 text-sm text-muted">Para fundos e ativos sem preço ou taxa, mostramos o valor investido.</p>}
             </div>
             {load.summary.holdings.length === 0 ? (
               <div className="mt-5 rounded-3xl border border-line bg-white p-6 text-center lg:mt-0">
@@ -89,20 +133,47 @@ export default function Portfolio() {
                 </Link>
               </div>
             ) : (
-              <ul className="mt-5 flex flex-col gap-4 lg:mt-0">
-                {load.summary.holdings.map((h) => (
-                  <li key={h.id}>
-                    <HoldingCard
-                      holding={h}
-                      open={expanded.includes(h.id)}
-                      onToggle={() => toggle(h.id)}
-                      onNewContribution={() => setSheet({ kind: "contribution", holding: h })}
-                    onRemove={() => setSheet({ kind: "removeInvestment", holding: h })}
-                    onRemoveContribution={(c) => setSheet({ kind: "removeContribution", holding: h, contribution: c })}
-                    />
-                  </li>
+              <div className="mt-5 lg:mt-0">
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Agrupar investimentos">
+                  <Chip selected={groupBy === "institution"} onClick={() => setGroupBy("institution")}>
+                    Por instituição
+                  </Chip>
+                  <Chip selected={groupBy === "type"} onClick={() => setGroupBy("type")}>
+                    Por tipo
+                  </Chip>
+                </div>
+                {groups.map((g) => (
+                  <section key={g.key} className="mt-6" aria-label={g.label}>
+                    <div className="flex items-baseline justify-between gap-3 px-1">
+                      <h2 className="text-lg font-semibold text-ink">
+                        {g.label}{" "}
+                        <span className="text-[0.95rem] font-normal text-muted">
+                          · {g.holdings.length} {g.holdings.length === 1 ? "investimento" : "investimentos"}
+                        </span>
+                      </h2>
+                      <span className="shrink-0 text-right">
+                        <span className="font-semibold text-ink tabular-nums">{money(g.value)}</span>
+                        {g.share > 0 && <span className="ml-2 text-muted tabular-nums">{pct(g.share)}</span>}
+                      </span>
+                    </div>
+                    <ul className="mt-3 flex flex-col gap-3">
+                      {g.holdings.map((h) => (
+                        <li key={h.id}>
+                          <HoldingCard
+                            holding={h}
+                            showInstitution={groupBy !== "institution"}
+                            open={expanded.includes(h.id)}
+                            onToggle={() => toggle(h.id)}
+                            onNewContribution={() => setSheet({ kind: "contribution", holding: h })}
+                            onRemove={() => setSheet({ kind: "removeInvestment", holding: h })}
+                            onRemoveContribution={(c) => setSheet({ kind: "removeContribution", holding: h, contribution: c })}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
                 ))}
-              </ul>
+              </div>
             )}
           </div>
         </>
@@ -111,6 +182,7 @@ export default function Portfolio() {
       {sheet?.kind === "investment" && (
         <Sheet title="Novo investimento" onClose={() => setSheet(null)}>
           <InvestmentForm
+            preferredInstitutions={preferredInstitutions}
             onSubmit={async (investment, contribution) => {
               const owned = load.status === "done" && load.summary.holdings.some((h) => h.ticker === investment.ticker);
               const created = await addInvestment(userId, investment);
@@ -118,28 +190,29 @@ export default function Portfolio() {
               await reload();
               setExpanded((e) => [...e, created.id]);
               setSheet(null);
-              toast(owned ? `Aporte em ${created.ticker} registrado` : `${created.ticker} adicionado à carteira`);
+              toast(owned ? `Aporte em ${displayName(created)} registrado` : `${displayName(created)} adicionado à carteira`);
             }}
           />
         </Sheet>
       )}
 
       {sheet?.kind === "contribution" && (
-        <Sheet title={`Novo aporte · ${sheet.holding.ticker}`} onClose={() => setSheet(null)}>
+        <Sheet title={`Novo aporte · ${displayName(sheet.holding)}`} onClose={() => setSheet(null)}>
           <ContributionForm
             suggestedPrice={sheet.holding.currentPrice}
+            amountBased={sheet.holding.amountBased}
             onSubmit={async (req) => {
               await addContribution(userId, sheet.holding.id, req);
               await reload();
               setSheet(null);
-              toast(`Aporte em ${sheet.holding.ticker} registrado`);
+              toast(`Aporte em ${displayName(sheet.holding)} registrado`);
             }}
           />
         </Sheet>
       )}
 
       {sheet?.kind === "removeInvestment" && (
-        <Sheet title={`Remover ${sheet.holding.ticker}?`} onClose={() => setSheet(null)}>
+        <Sheet title={`Remover ${displayName(sheet.holding)}?`} onClose={() => setSheet(null)}>
           <ConfirmRemoval
             message={
               sheet.holding.contributions.length > 0
@@ -153,7 +226,7 @@ export default function Portfolio() {
               await reload();
               setExpanded((e) => e.filter((id) => id !== sheet.holding.id));
               setSheet(null);
-              toast(`${sheet.holding.ticker} removido da carteira`);
+              toast(`${displayName(sheet.holding)} removido da carteira`);
             }}
           />
         </Sheet>
@@ -164,7 +237,7 @@ export default function Portfolio() {
           <ConfirmRemoval
             message={
               <>
-                Aporte de <strong className="text-ink">{money(sheet.contribution.amount)}</strong> em {sheet.holding.ticker},
+                Aporte de <strong className="text-ink">{money(sheet.contribution.amount)}</strong> em {displayName(sheet.holding)},
                 feito em {dateBR(sheet.contribution.contributionDate)}. A quantidade e o preço médio do ativo serão recalculados.
               </>
             }
@@ -185,6 +258,7 @@ export default function Portfolio() {
 
 function HoldingCard({
   holding: h,
+  showInstitution,
   open,
   onToggle,
   onNewContribution,
@@ -192,6 +266,7 @@ function HoldingCard({
   onRemoveContribution,
 }: {
   holding: Holding;
+  showInstitution: boolean;
   open: boolean;
   onToggle: () => void;
   onNewContribution: () => void;
@@ -199,12 +274,19 @@ function HoldingCard({
   onRemoveContribution: (c: Contribution) => void;
 }) {
   const panelId = `aportes-${h.id}`;
-  const subtitle =
-    h.totalQuantity === 0
-      ? "Nenhum aporte ainda"
-      : h.assetType === "FIXED_INCOME"
-        ? `${h.assetName} · ${money(h.totalInvested)} investidos`
-        : `${qty(h.totalQuantity)} ${unitLabel(h.assetType, h.totalQuantity)} · PM ${money(h.averagePrice)}`;
+  const name = displayName(h);
+  const details: string[] = [];
+  if (showInstitution) details.push(institutionOf(h));
+  if (h.totalQuantity === 0) details.push("Nenhum aporte ainda");
+  else if (h.amountBased) {
+    if (h.rateType && h.rateValue) details.push(rateLabel(h.rateType, h.rateValue));
+    else details.push(`${money(h.totalInvested)} aplicados`);
+    if (h.maturityDate) details.push(`vence ${dateBR(h.maturityDate).slice(3)}`);
+  } else {
+    // Ticker da bolsa no título; o nome completo ajuda quem não decorou o código
+    if (name === h.ticker && h.assetName) details.push(h.assetName);
+    details.push(`${qty(h.totalQuantity)} ${unitLabel(h.assetType, h.totalQuantity)} · PM ${money(h.averagePrice)}`);
+  }
 
   return (
     <article className="overflow-hidden rounded-3xl border border-line bg-white">
@@ -216,12 +298,19 @@ function HoldingCard({
         className="flex w-full items-center gap-3 px-5 py-5 text-left"
       >
         <span className="min-w-0 flex-1">
-          <span className="block text-xl font-bold break-words text-ink">{h.ticker}</span>
-          <span className="block text-[0.95rem] text-muted">{subtitle}</span>
+          <span className="block text-xl font-bold break-words text-ink">{name}</span>
+          <span className="block text-[0.95rem] text-muted">{details.join(" · ")}</span>
         </span>
         <span className="flex shrink-0 flex-col items-end">
           <span className="text-lg font-bold whitespace-nowrap text-ink">{money(h.currentValue)}</span>
-          <Trend gain={h.gain} gainPct={h.gainPct} showAmount={false} />
+          {h.valuation === "invested" ? (
+            <span className="text-sm text-muted">valor aplicado</span>
+          ) : (
+            <span className="flex items-baseline gap-1.5">
+              <Trend gain={h.gain} gainPct={h.gainPct} showAmount={false} />
+              {h.valuation === "estimated" && <span className="text-sm text-muted">estimado</span>}
+            </span>
+          )}
         </span>
         <svg
           width="20"
@@ -247,7 +336,7 @@ function HoldingCard({
                   <span className="size-2 shrink-0 rounded-full bg-brand" aria-hidden />
                   <span className="text-muted tabular-nums">{dateBR(c.contributionDate)}</span>
                   <span className="flex-1 text-ink tabular-nums">
-                    {qty(c.quantity)} × {money(c.unitPrice)}
+                    {h.amountBased ? "Aplicação" : `${qty(c.quantity)} × ${money(c.unitPrice)}`}
                   </span>
                   <span className="font-semibold text-ink tabular-nums">{money(c.amount)}</span>
                   <button

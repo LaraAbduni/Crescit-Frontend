@@ -4,11 +4,12 @@ import { ASSET_TYPE_LABEL, type AssetType } from "~/lib/recommendations";
 
 // Paleta categórica validada (scripts/validate_palette.js da skill de dataviz):
 // passa em CVD e visão normal para todos os vizinhos do anel, inclusive
-// último↔primeiro. Ordem do anel = ALLOCATION_ORDER (Renda Fixa, ETF, FII, Ação).
+// último↔primeiro. Ordem do anel = ALLOCATION_ORDER (Renda Fixa, Fundo, ETF, FII, Ação).
 // Aqua e amarelo têm contraste < 3:1 com o fundo, por isso a legenda com os
 // percentuais fica sempre visível.
 export const ASSET_TYPE_COLOR: Record<AssetType, string> = {
   FIXED_INCOME: "#1baf7a",
+  FUND: "#6250d6",
   ETF: "#eb6834",
   FII: "#2a78d6",
   STOCK: "#eda100",

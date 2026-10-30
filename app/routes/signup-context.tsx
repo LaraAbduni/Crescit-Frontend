@@ -2,26 +2,14 @@ import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router";
 import type { Route } from "./+types/signup-context";
 import { Chip, Eyebrow, OptionCard, PrimaryButton, Screen, StepHeader, Title } from "~/components/ui";
+import { INSTITUTIONS } from "~/lib/institutions";
 import { useOnboarding } from "~/lib/onboarding";
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "Seu contexto · Crescit" }];
 }
 
-const BANKS = [
-  "Nubank",
-  "Itaú",
-  "Bradesco",
-  "Banco do Brasil",
-  "Caixa",
-  "Santander",
-  "Inter",
-  "C6 Bank",
-  "BTG Pactual",
-  "XP",
-  "Rico",
-  "Outro",
-];
+const BANKS = [...INSTITUTIONS, "Outro"];
 const NO_ACCOUNT = "Nenhuma";
 
 const MONTHLY_AMOUNTS = [

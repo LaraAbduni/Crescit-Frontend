@@ -1,8 +1,9 @@
 import { recommendationsApi } from "./api";
 import type { InvestorType } from "./profile";
 
-// Valores dos enums do Serviço de Recomendações (entity/AssetType e RiskLevel)
-export type AssetType = "STOCK" | "FII" | "ETF" | "FIXED_INCOME";
+// Valores dos enums do Serviço de Recomendações (entity/AssetType e RiskLevel).
+// FUND só existe no Serviço de Portfólio: fundos são cadastrados pelo usuário.
+export type AssetType = "STOCK" | "FII" | "ETF" | "FIXED_INCOME" | "FUND";
 export type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
 
 /** RecommendationResponseDto */
@@ -26,6 +27,7 @@ export const ASSET_TYPE_LABEL: Record<AssetType, string> = {
   FII: "FII",
   ETF: "ETF",
   FIXED_INCOME: "Renda Fixa",
+  FUND: "Fundo",
 };
 
 export const RISK_LABEL: Record<RiskLevel, string> = {
@@ -48,6 +50,7 @@ export const ASSET_TYPE_DESCRIPTION: Record<AssetType, string> = {
   ETF: "Diversifica em vários ativos com uma única compra.",
   FII: "Renda mensal de aluguéis de imóveis, sem precisar comprar um imóvel.",
   STOCK: "Participação direta em uma empresa, com potencial de valorização no longo prazo.",
+  FUND: "Um gestor profissional escolhe os ativos: diversifica sem precisar escolher cada um.",
 };
 
 /**

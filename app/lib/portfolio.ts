@@ -1,4 +1,7 @@
 import { ApiError, portfolioApi } from "./api";
+import { estimateValue, type RateType } from "./fixed-income";
+import { todayISO } from "./format";
+import { NO_INSTITUTION } from "./institutions";
 import { getAssets, type AssetType } from "./recommendations";
 
 /** InvestmentRequest do Serviço de Portfólio. */
@@ -6,6 +9,12 @@ export interface InvestmentRequest {
   ticker: string;
   assetName: string;
   assetType: AssetType;
+  institution?: string;
+  /** Renda fixa: como a rentabilidade foi contratada (vai junto com rateValue) */
+  rateType?: RateType;
+  rateValue?: number;
+  /** yyyy-mm-dd */
+  maturityDate?: string;
 }
 
 /** ContributionRequest */
@@ -26,6 +35,11 @@ export interface Investment {
   totalQuantity: number;
   totalInvested: number;
   averagePrice: number;
+  /** Ausentes nos investimentos cadastrados antes desses campos existirem */
+  institution?: string | null;
+  rateType?: RateType | null;
+  rateValue?: number | null;
+  maturityDate?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -93,11 +107,22 @@ export async function deleteContribution(userId: string, investmentId: string, c
 
 // --- Resumo da carteira (usado pela Carteira e pelo Início) --------------
 
+/**
+ * De onde vem o valor atual:
+ * - market: preço do catálogo × quantidade
+ * - estimated: renda fixa estimada pela taxa contratada
+ * - invested: sem preço nem taxa, mostramos o valor investido
+ */
+export type Valuation = "market" | "estimated" | "invested";
+
 export interface Holding extends Investment {
   contributions: Contribution[];
   /** Preço atual vindo do Serviço de Recomendações; ausente se o ativo não estiver no catálogo. */
   currentPrice?: number;
   currentValue: number;
+  valuation: Valuation;
+  /** Renda fixa e fundos cadastrados por valor aplicado, sem cotação no catálogo */
+  amountBased: boolean;
   gain: number;
   /** null quando não há preço ou nada investido */
   gainPct: number | null;
@@ -105,6 +130,7 @@ export interface Holding extends Investment {
 
 export interface PortfolioSummary {
   hasMissingPrices: boolean;
+  hasEstimates: boolean;
   holdings: Holding[];
   totalInvested: number;
   currentValue: number;
@@ -112,11 +138,31 @@ export interface PortfolioSummary {
   gainPct: number | null;
   /** Valor atual por tipo de ativo, na ordem fixa de ALLOCATION_ORDER */
   allocation: { type: AssetType; value: number; share: number }[];
-  recentContributions: (Contribution & { ticker: string; assetType: AssetType })[];
+  /** Valor atual por instituição, da maior para a menor */
+  byInstitution: { institution: string; value: number; share: number; count: number }[];
+  recentContributions: (Contribution & { ticker: string; assetName: string; assetType: AssetType; amountBased: boolean })[];
 }
 
 /** Ordem fixa dos tipos no gráfico (a cor segue o tipo, não o tamanho). */
-export const ALLOCATION_ORDER: AssetType[] = ["FIXED_INCOME", "ETF", "FII", "STOCK"];
+export const ALLOCATION_ORDER: AssetType[] = ["FIXED_INCOME", "FUND", "ETF", "FII", "STOCK"];
+
+export const institutionOf = (i: Pick<Investment, "institution">) => i.institution || NO_INSTITUTION;
+
+/** Renda fixa e fundos sem cotação no catálogo são registrados por valor aplicado. */
+export const isAmountBased = (type: AssetType, hasCatalogPrice: boolean) =>
+  (type === "FIXED_INCOME" || type === "FUND") && !hasCatalogPrice;
+
+/** Código interno para renda fixa e fundos, que não têm ticker na bolsa. */
+export function generatedTicker(type: AssetType) {
+  const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
+  return `${type === "FUND" ? "FD" : "RF"}-${suffix}`;
+}
+
+const isGeneratedTicker = (ticker: string) => /^(RF|FD)-[A-Z0-9]{6}$/.test(ticker);
+
+/** Nome mostrado na tela: o ticker da bolsa ou, sem ele, o nome dado pelo usuário. */
+export const displayName = (i: { ticker: string; assetName: string }) =>
+  isGeneratedTicker(i.ticker) ? i.assetName : i.ticker;
 
 export async function loadPortfolio(userId: string): Promise<PortfolioSummary> {
   const [investments, prices] = await Promise.all([
@@ -128,17 +174,28 @@ export async function loadPortfolio(userId: string): Promise<PortfolioSummary> {
   ]);
   const contributions = await Promise.all(investments.map((i) => listContributions(userId, i.id)));
 
+  const today = todayISO();
   const holdings: Holding[] = investments.map((inv, idx) => {
     const currentPrice = prices.get(inv.ticker);
-    const currentValue = currentPrice !== undefined ? inv.totalQuantity * currentPrice : inv.totalInvested;
+    let valuation: Valuation = "invested";
+    let currentValue = inv.totalInvested;
+    if (currentPrice !== undefined) {
+      valuation = "market";
+      currentValue = inv.totalQuantity * currentPrice;
+    } else if (inv.rateType && inv.rateValue) {
+      valuation = "estimated";
+      currentValue = estimateValue(contributions[idx], inv.rateType, inv.rateValue, today);
+    }
     const gain = currentValue - inv.totalInvested;
     return {
       ...inv,
       contributions: contributions[idx],
       currentPrice,
       currentValue,
+      valuation,
+      amountBased: isAmountBased(inv.assetType, currentPrice !== undefined),
       gain,
-      gainPct: currentPrice !== undefined && inv.totalInvested > 0 ? gain / inv.totalInvested : null,
+      gainPct: valuation !== "invested" && inv.totalInvested > 0 ? gain / inv.totalInvested : null,
     };
   });
   holdings.sort((a, b) => b.currentValue - a.currentValue || a.ticker.localeCompare(b.ticker));
@@ -152,18 +209,32 @@ export async function loadPortfolio(userId: string): Promise<PortfolioSummary> {
     return { type, value, share: currentValue > 0 ? value / currentValue : 0 };
   }).filter((a) => a.value > 0);
 
+  const institutions = new Map<string, { value: number; count: number }>();
+  for (const h of holdings) {
+    const key = institutionOf(h);
+    const entry = institutions.get(key) ?? { value: 0, count: 0 };
+    institutions.set(key, { value: entry.value + h.currentValue, count: entry.count + 1 });
+  }
+  const byInstitution = [...institutions.entries()]
+    .map(([institution, { value, count }]) => ({ institution, value, count, share: currentValue > 0 ? value / currentValue : 0 }))
+    .sort((a, b) => b.value - a.value);
+
   const recentContributions = holdings
-    .flatMap((h) => h.contributions.map((c) => ({ ...c, ticker: h.ticker, assetType: h.assetType })))
+    .flatMap((h) =>
+      h.contributions.map((c) => ({ ...c, ticker: h.ticker, assetName: h.assetName, assetType: h.assetType, amountBased: h.amountBased })),
+    )
     .sort((a, b) => b.contributionDate.localeCompare(a.contributionDate) || b.createdAt.localeCompare(a.createdAt));
 
   return {
-    hasMissingPrices: holdings.some((h) => h.currentPrice === undefined),
+    hasMissingPrices: holdings.some((h) => h.valuation === "invested" && h.totalInvested > 0),
+    hasEstimates: holdings.some((h) => h.valuation === "estimated"),
     holdings,
     totalInvested,
     currentValue,
     gain,
-    gainPct: totalInvested > 0 && holdings.every((h) => h.currentPrice !== undefined) ? gain / totalInvested : null,
+    gainPct: totalInvested > 0 && holdings.some((h) => h.valuation !== "invested") ? gain / totalInvested : null,
     allocation,
+    byInstitution,
     recentContributions,
   };
 }
@@ -174,5 +245,6 @@ export function unitLabel(type: AssetType, quantity: number) {
   const one = quantity === 1;
   if (type === "STOCK") return one ? "ação" : "ações";
   if (type === "FIXED_INCOME") return one ? "título" : "títulos";
+  if (type === "FUND") return one ? "cota" : "cotas";
   return one ? "cota" : "cotas";
 }

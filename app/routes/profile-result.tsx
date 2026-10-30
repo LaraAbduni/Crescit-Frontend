@@ -11,19 +11,28 @@ export function meta({}: Route.MetaArgs) {
 
 export default function ProfileResult() {
   const navigate = useNavigate();
-  const { answers, profile, ready } = useOnboarding();
+  const { answers, context, profile, ready } = useOnboarding();
 
   if (!ready) return null;
   if (!profile) return <Navigate to="/perfil/questionario" replace />;
 
   const info = INVESTOR_TYPES[profile.investorType];
+  // Quem marcou bancos no cadastro segue para cadastrar o que já tem neles
+  const hasBanks = (context?.banks ?? []).some((b) => b !== "Nenhuma");
   const [lo, hi] = info.range;
 
   return (
     <Screen
       footer={
         <>
-          <PrimaryButton onClick={() => navigate("/recomendacoes")}>Ver minhas recomendações</PrimaryButton>
+          {hasBanks ? (
+            <>
+              <PrimaryButton onClick={() => navigate("/cadastro/investimentos")}>Cadastrar meus investimentos</PrimaryButton>
+              <TextButton onClick={() => navigate("/recomendacoes")}>Ver minhas recomendações</TextButton>
+            </>
+          ) : (
+            <PrimaryButton onClick={() => navigate("/recomendacoes")}>Ver minhas recomendações</PrimaryButton>
+          )}
           <TextButton onClick={() => navigate("/perfil/questionario?pergunta=1")}>Refazer questionário</TextButton>
         </>
       }
