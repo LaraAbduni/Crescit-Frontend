@@ -1,5 +1,6 @@
 import { Navigate, useNavigate } from "react-router";
 import { useAuth0 } from "@auth0/auth0-react";
+import { useState } from "react";
 import type { Route } from "./+types/welcome";
 import { Logo, PrimaryButton, Screen, TextButton } from "~/components/ui";
 import { QUESTIONS } from "~/lib/profile";
@@ -28,8 +29,22 @@ const HIGHLIGHTS = [
 
 export default function Welcome() {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth0();
+  const { isAuthenticated, loginWithRedirect } = useAuth0();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
   if (isAuthenticated) return <Navigate to="/inicio" replace />;
+
+  // Quem já tem conta vai direto para o login; quem não tem, sem perfil, cai no cadastro depois
+  async function login() {
+    setBusy(true);
+    setError(false);
+    try {
+      await loginWithRedirect({ appState: { returnTo: "/inicio" } });
+    } catch {
+      setError(true);
+      setBusy(false);
+    }
+  }
 
   return (
     <Screen header={<Logo />} wide>
@@ -60,8 +75,9 @@ export default function Welcome() {
         </ol>
 
         <div className="mt-auto flex flex-col gap-4 pt-8 lg:col-start-1 lg:row-start-2 lg:mt-0 lg:max-w-sm lg:self-start lg:pt-0">
-          <PrimaryButton onClick={() => navigate("/cadastro")}>Criar minha conta</PrimaryButton>
-          <TextButton onClick={() => navigate("/cadastro?entrar=1")}>Já tenho conta</TextButton>
+          {error && <p role="alert" className="text-center text-aggressive">Não foi possível abrir o login. Tente novamente.</p>}
+          <PrimaryButton onClick={() => navigate("/cadastro")} disabled={busy}>Criar minha conta</PrimaryButton>
+          <TextButton onClick={login} disabled={busy}>{busy ? "Abrindo acesso seguro..." : "Já tenho conta"}</TextButton>
         </div>
       </div>
     </Screen>
