@@ -21,6 +21,30 @@
   --color-moderate-text: #9a6413;
   --color-moderate-soft: #fbefd6;
   --color-aggressive: #e2694d;
+
+  /* Juju: painel que sobe (celular) ou entra pela lateral (computador) */
+  --animate-juju-up: juju-up 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-juju-side: juju-side 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-juju-pop: juju-pop 220ms ease-out;
+  --animate-juju-wiggle: juju-wiggle 600ms ease-in-out;
+
+  @keyframes juju-up {
+    from { transform: translateY(24px); opacity: 0; }
+    to { transform: none; opacity: 1; }
+  }
+  @keyframes juju-side {
+    from { transform: translateX(100%); }
+    to { transform: none; }
+  }
+  @keyframes juju-pop {
+    from { transform: translateY(6px) scale(0.98); opacity: 0; }
+    to { transform: none; opacity: 1; }
+  }
+  @keyframes juju-wiggle {
+    0%, 100% { transform: rotate(0); }
+    25% { transform: rotate(-10deg); }
+    75% { transform: rotate(10deg); }
+  }
 }
 
 html,
