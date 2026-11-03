@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { Sheet } from "~/components/sheet";
 import { answer, MASCOT_NAME, SUGGESTED_QUESTIONS, type JujuAnswer } from "~/lib/juju";
 import { todayISO } from "~/lib/format";
+import { useGoals } from "~/lib/goals";
 import type { InvestorType } from "~/lib/profile";
 import { useMonthlyGoal } from "~/lib/use-monthly-goal";
 import { usePortfolio } from "~/lib/use-portfolio";
@@ -46,6 +47,7 @@ function JujuChat({ userId, investorType, onClose }: { userId: string; investorT
   // A carteira só é carregada quando a conversa abre
   const { load } = usePortfolio(userId);
   const [goal] = useMonthlyGoal(userId);
+  const { goals } = useGoals(userId);
   const [messages, setMessages] = useState<Message[]>(() => [{ from: "juju", id: 0, ...answer("oi", { investorType, goal, today: todayISO() }) }]);
   const [typing, setTyping] = useState(false);
   const [input, setInput] = useState("");
@@ -65,18 +67,13 @@ function JujuChat({ userId, investorType, onClose }: { userId: string; investorT
     const summary = load.status === "done" ? load.summary : undefined;
     // Uma pausa curta para a resposta não aparecer junto com a pergunta
     window.setTimeout(() => {
-      setMessages((m) => [...m, { from: "juju", id: nextId.current++, ...answer(text, { summary, investorType, goal, today: todayISO() }) }]);
+      setMessages((m) => [...m, { from: "juju", id: nextId.current++, ...answer(text, { summary, investorType, goal, goals, today: todayISO() }) }]);
       setTyping(false);
     }, 650);
   }
 
   return (
     <Sheet title={MASCOT_NAME} onClose={onClose}>
-      <p className="-mt-3 mb-4 rounded-xl bg-moderate-soft px-3 py-2 text-sm text-moderate-text">
-        <span className="font-semibold">Prévia.</span> Por enquanto a {MASCOT_NAME} usa respostas prontas com os dados da sua
-        carteira. Na próxima versão, ela vai conversar com IA.
-      </p>
-
       <div role="log" aria-live="polite" aria-label="Conversa" className="flex h-[min(24rem,45dvh)] flex-col gap-3 overflow-y-auto rounded-2xl bg-white p-4">
         {messages.map((m) =>
           m.from === "user" ? (

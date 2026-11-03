@@ -48,6 +48,10 @@ describe("modo demonstração", () => {
     expect(setContext).toHaveBeenCalledWith(persona.context);
     expect(setGoal).toHaveBeenCalledWith(1500);
     expect(progress.at(-1)).toBe(1);
+    const goals = JSON.parse(localStorage.getItem("crescit:objetivos:user-1")!);
+    expect(goals).toHaveLength(3);
+    expect(goals[1]).toMatchObject({ name: "Viagem para a Europa", target: 25000 });
+    expect(goals[1].deadline).toMatch(/^\d{4}-\d{2}$/);
   });
 
   it("a persona iniciante fica com a carteira vazia e o plano de primeiros passos preenchido", async () => {

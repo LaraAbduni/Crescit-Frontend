@@ -181,7 +181,7 @@ function NextStep({ summary, investorType, goal }: { summary: PortfolioSummary; 
         }
         links={[
           { to: "/recomendacoes", label: "Ver sugestões" },
-          { to: "/analise", label: "Ver análise" },
+          { to: "/metas", label: "Ajustar metas" },
         ]}
       />
     );

@@ -2,6 +2,7 @@
 // o modo demonstração só cadastra, na conta logada, o que a pessoa cadastraria à mão.
 
 import { planStorageKey } from "./first-steps";
+import { goalsStorageKey, type Goal } from "./goals";
 import type { RateType } from "./fixed-income";
 import type { FinancialContext } from "./onboarding";
 import {
@@ -39,6 +40,8 @@ export interface Persona {
   context: FinancialContext;
   monthlyGoal: number;
   firstSteps?: { expenses: string; saved: string; hasAccount: boolean };
+  /** Objetivos da página Metas; o prazo é em meses a partir de hoje */
+  goals: (Omit<Goal, "id" | "deadline"> & { monthsAhead: number })[];
   investments: DemoInvestment[];
 }
 
@@ -50,6 +53,11 @@ export const PERSONAS: Record<PersonaId, Persona> = {
     expectedProfile: "MODERATE",
     context: { banks: ["Itaú", "BTG Pactual", "Nubank"], monthlyAmount: "500_2000" },
     monthlyGoal: 1500,
+    goals: [
+      { kind: "reserva", name: "Reserva de emergência", target: 15000, saved: 15000, monthsAhead: 2 },
+      { kind: "viagem", name: "Viagem para a Europa", target: 25000, saved: 8000, monthsAhead: 14 },
+      { kind: "casa", name: "Entrada do apartamento", target: 80000, saved: 7000, monthsAhead: 48 },
+    ],
     investments: [
       {
         institution: "Itaú",
@@ -129,6 +137,7 @@ export const PERSONAS: Record<PersonaId, Persona> = {
     context: { banks: ["Nenhuma"], monthlyAmount: "ATE_500" },
     monthlyGoal: 300,
     firstSteps: { expenses: "2500", saved: "2000", hasAccount: false },
+    goals: [{ kind: "reserva", name: "Reserva de emergência", target: 15000, saved: 2000, monthsAhead: 36 }],
     investments: [],
   },
 };
@@ -144,6 +153,11 @@ export function monthsAgoISO(monthsAgo: number, today = new Date()) {
 
 export function daysFromTodayISO(days: number, today = new Date()) {
   return iso(new Date(today.getFullYear(), today.getMonth(), today.getDate() + days));
+}
+
+/** yyyy-mm daqui a N meses */
+export function monthsAheadISO(months: number, today = new Date()) {
+  return iso(new Date(today.getFullYear(), today.getMonth() + months, 1)).slice(0, 7);
 }
 
 export function toInvestmentRequest(inv: DemoInvestment, today = new Date()): InvestmentRequest {
@@ -164,8 +178,8 @@ export async function clearPortfolio(userId: string) {
 }
 
 /**
- * Troca a carteira da conta logada pela da persona e salva meta, contexto e
- * primeiros passos neste navegador. `onProgress` recebe de 0 a 1.
+ * Troca a carteira da conta logada pela da persona e salva meta, objetivos,
+ * contexto e primeiros passos neste navegador. `onProgress` recebe de 0 a 1.
  */
 export async function applyPersona(
   userId: string,
@@ -199,6 +213,8 @@ export async function applyPersona(
   try {
     if (persona.firstSteps) localStorage.setItem(planStorageKey(userId), JSON.stringify(persona.firstSteps));
     else localStorage.removeItem(planStorageKey(userId));
+    const goals: Goal[] = persona.goals.map(({ monthsAhead, ...g }, i) => ({ ...g, id: `demo-${i}`, deadline: monthsAheadISO(monthsAhead, today) }));
+    localStorage.setItem(goalsStorageKey(userId), JSON.stringify(goals));
   } catch {}
   onProgress(1);
 }

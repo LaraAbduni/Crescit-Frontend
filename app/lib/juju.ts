@@ -5,6 +5,7 @@
 import { compareAllocation, monthlyHistory, monthLabel, portfolioAlerts, suggestContribution, TARGET_ALLOCATION } from "./analysis";
 import { taxedEquivalentCdiPercent } from "./fixed-income";
 import { money, pct, qty } from "./format";
+import { goalRate, monthlyNeeded, monthsUntil, type Goal } from "./goals";
 import { marketRates, ratePct } from "./market-rates";
 import { displayName, type PortfolioSummary } from "./portfolio";
 import { INVESTOR_TYPES, type InvestorType } from "./profile";
@@ -17,6 +18,8 @@ export interface JujuContext {
   summary?: PortfolioSummary;
   investorType: InvestorType;
   goal: number;
+  /** Objetivos da página Metas */
+  goals?: Goal[];
   /** yyyy-mm-dd */
   today: string;
 }
@@ -32,6 +35,7 @@ export const SUGGESTED_QUESTIONS = [
   "LCI ou CDB?",
   "O que é FII?",
   "Tem algo pedindo atenção?",
+  "Como estão meus objetivos?",
 ];
 
 /** Minúsculas e sem acento, para comparar palavras-chave. */
@@ -46,6 +50,7 @@ interface Topic {
 const TOPICS: Topic[] = [
   { match: /\b(oi|ola|bom dia|boa tarde|boa noite|e ai)\b/, reply: () => ({ text: greeting() }) },
   { match: /\b(lci|lca)\b.*\b(cdb)\b|\b(cdb)\b.*\b(lci|lca)\b|isent|imposto|\bir\b/, reply: () => lciVersusCdb() },
+  { match: /objetiv|sonho|viagem|casa|apartamento|carro|chegar la/, reply: (ctx) => goalsOverview(ctx) },
   { match: /aport|quanto (devo |posso )?(investir|colocar)|este mes|esse mes|meta/, reply: (ctx) => monthlyContribution(ctx) },
   { match: /atenc|alerta|risco|preocup|venc|fgc/, reply: (ctx) => attention(ctx) },
   { match: /carteira|patrimonio|como (esta|estou|vai)|rendi|ganh|perd/, reply: (ctx) => portfolioOverview(ctx) },
@@ -68,7 +73,7 @@ export function answer(question: string, ctx: JujuContext): JujuAnswer {
   if (topic) return topic.reply(ctx);
   return {
     text:
-      "Ainda não sei responder isso. Nesta prévia eu entendo perguntas sobre a sua carteira, o aporte do mês, pontos de atenção, " +
+      "Ainda não sei responder isso. Por enquanto eu entendo perguntas sobre a sua carteira, o aporte do mês, pontos de atenção, " +
       "seu perfil e o básico de CDB, LCI, Tesouro, FIIs, ETFs e ações. Na versão com IA, vou conseguir conversar sobre qualquer dúvida.",
   };
 }
@@ -122,6 +127,24 @@ function monthlyContribution({ summary, investorType, goal, today }: JujuContext
         ? ` Para aproximar a carteira da referência do seu perfil, eu dividiria assim: ${joinPt(parts)}.`
         : " Sua carteira já está na referência do perfil, então pode manter a divisão atual."),
     links: [{ to: "/recomendacoes", label: "Ver sugestões de ativos" }],
+  };
+}
+
+function goalsOverview({ goals = [], investorType, today, goal }: JujuContext): JujuAnswer {
+  if (goals.length === 0) {
+    return {
+      text: "Você ainda não cadastrou objetivos. Dar um destino para o dinheiro (uma viagem, a reserva, a entrada de um imóvel) ajuda a manter a constância: eu calculo quanto guardar por mês para cada um.",
+      links: [{ to: "/metas", label: "Criar um objetivo" }],
+    };
+  }
+  const needs = goals.map((g) => ({ g, need: monthlyNeeded(g, today, goalRate(monthsUntil(g.deadline, today), investorType)) }));
+  const total = needs.reduce((acc, n) => acc + n.need, 0);
+  const parts = needs.map(({ g, need }) => (need === 0 ? `${g.name} (já garantido)` : `${g.name}: ${money(Math.ceil(need))} por mês`));
+  return {
+    text:
+      `Seus objetivos: ${joinPt(parts)}. No total, cerca de ${money(Math.ceil(total))} por mês` +
+      (total <= goal ? `, e sua meta de ${money(goal)} dá conta.` : `, acima da sua meta de ${money(goal)}. Vale aumentar a meta ou estender algum prazo.`),
+    links: [{ to: "/metas", label: "Ver metas" }],
   };
 }
 

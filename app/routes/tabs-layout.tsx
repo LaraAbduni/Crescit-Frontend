@@ -9,6 +9,7 @@ const TABS = [
   { to: "/recomendacoes", label: "Recomendações", short: "Sugestões", icon: CompassIcon },
   { to: "/carteira", label: "Carteira", short: "Carteira", icon: BriefcaseIcon },
   { to: "/analise", label: "Análise", short: "Análise", icon: ChartIcon },
+  { to: "/metas", label: "Metas", short: "Metas", icon: TargetIcon },
 ];
 
 /** Telas principais do app (depois do onboarding): navegação inferior no celular e lateral no computador. */
@@ -78,7 +79,7 @@ export default function TabsLayout() {
       </aside>
 
       <div className="lg:pl-[104px]">
-        <div className="mx-auto w-full max-w-md px-6 pt-12 pb-32 md:max-w-3xl lg:max-w-5xl lg:px-10 lg:pb-16">
+        <div className="mx-auto w-full max-w-md px-6 pt-12 pb-32 md:max-w-3xl lg:max-w-[1360px] lg:px-10 lg:pt-10 lg:pb-28 xl:px-12">
           <div className="mb-6 flex items-center justify-between gap-4 text-sm text-muted lg:hidden">
             <span className="truncate">{userLabel}</span>
             <button type="button" className="shrink-0 font-semibold text-brand hover:underline" onClick={handleLogout}>Sair</button>
@@ -91,17 +92,17 @@ export default function TabsLayout() {
       <JujuLauncher userId={profile.userId} investorType={profile.investorType} />
 
       <nav className="fixed inset-x-0 bottom-0 border-t border-line bg-white lg:hidden">
-        <ul className="mx-auto grid max-w-md grid-cols-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          {TABS.map(({ to, label, icon: Icon }) => (
+        <ul className="mx-auto grid max-w-lg grid-cols-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          {TABS.map(({ to, short, icon: Icon }) => (
             <li key={to}>
               <NavLink
                 to={to}
                 className={({ isActive }) =>
-                  `flex flex-col items-center gap-1 text-[0.8rem] min-[400px]:text-[0.9rem] ${isActive ? "font-semibold text-brand" : "text-muted"}`
+                  `flex flex-col items-center gap-1 text-[0.75rem] min-[400px]:text-[0.85rem] ${isActive ? "font-semibold text-brand" : "text-muted"}`
                 }
               >
                 <Icon />
-                {label}
+                {short}
               </NavLink>
             </li>
           ))}
@@ -161,6 +162,16 @@ function LogoutIcon() {
     <svg {...iconProps} width={20} height={20}>
       <path d="M14 4.5h3.5a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5H14" />
       <path d="M10 8l-4 4 4 4M6 12h9" />
+    </svg>
+  );
+}
+
+function TargetIcon({ size = 28 }: { size?: number }) {
+  return (
+    <svg {...iconProps} width={size} height={size}>
+      <circle cx="12" cy="12" r="8.5" />
+      <circle cx="12" cy="12" r="4.5" />
+      <circle cx="12" cy="12" r="0.8" fill="currentColor" />
     </svg>
   );
 }

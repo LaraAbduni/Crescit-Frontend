@@ -13,6 +13,7 @@ export default [
       route("recomendacoes", "routes/recommendations.tsx"),
       route("carteira", "routes/portfolio.tsx"),
       route("analise", "routes/analysis.tsx"),
+      route("metas", "routes/goals.tsx"),
       route("primeiros-passos", "routes/first-steps.tsx"),
       // Fora do menu: prepara as contas da apresentação
       route("demo", "routes/demo.tsx"),

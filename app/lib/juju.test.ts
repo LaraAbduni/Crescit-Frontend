@@ -57,6 +57,19 @@ describe("Juju (prévia com respostas prontas)", () => {
     expect(answer("minha carteira", { ...ctx, summary: empty }).links?.map((l) => l.to)).toContain("/primeiros-passos");
   });
 
+  it("diz quanto guardar por mês para cada objetivo e compara com a meta", () => {
+    const goals = [
+      { id: "a", kind: "viagem" as const, name: "Viagem", target: 12000, saved: 0, deadline: "2027-11" },
+      { id: "b", kind: "reserva" as const, name: "Reserva", target: 5000, saved: 5000, deadline: "2027-01" },
+    ];
+    const { text, links } = answer("como estão meus objetivos?", { ...ctx, goals });
+    expect(text).toMatch(/Viagem: R\$ 9\d\d,00 por mês/);
+    expect(text).toContain("Reserva (já garantido)");
+    expect(text).toContain("dá conta");
+    expect(links?.[0].to).toBe("/metas");
+    expect(answer("meus objetivos", ctx).links?.[0].to).toBe("/metas");
+  });
+
   it("tem uma resposta para cada pergunta sugerida e um fallback honesto", () => {
     for (const q of SUGGESTED_QUESTIONS) expect(answer(q, ctx).text).not.toContain("Ainda não sei");
     expect(answer("qual o melhor time de futebol?", ctx).text).toContain("Ainda não sei");
