@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { Sheet } from "~/components/sheet";
+import { jujuApi } from "~/lib/api";
 import { answer, MASCOT_NAME, SUGGESTED_QUESTIONS, type JujuAnswer } from "~/lib/juju";
+import { buildJujuFacts } from "~/lib/juju-context";
 import { todayISO } from "~/lib/format";
 import { useGoals } from "~/lib/goals";
 import { usePriceAlerts } from "~/lib/price-alerts";
@@ -60,18 +62,27 @@ function JujuChat({ userId, investorType, onClose }: { userId: string; investorT
     endRef.current?.scrollIntoView?.({ block: "end" });
   }, [messages, typing]);
 
-  function ask(question: string) {
+  async function ask(question: string) {
     const text = question.trim();
     if (!text || typing) return;
     setInput("");
-    setMessages((m) => [...m, { from: "user", id: nextId.current++, text }]);
+    const conversation: Message[] = [...messages, { from: "user", id: nextId.current++, text }];
+    setMessages(conversation);
     setTyping(true);
     const summary = load.status === "done" ? load.summary : undefined;
-    // Uma pausa curta para a resposta não aparecer junto com a pergunta
-    window.setTimeout(() => {
-      setMessages((m) => [...m, { from: "juju", id: nextId.current++, ...answer(text, { summary, investorType, goal, goals, priceAlerts, today: todayISO() }) }]);
-      setTyping(false);
-    }, 650);
+    const ctx = { summary, investorType, goal, goals, priceAlerts, today: todayISO() };
+    let reply: JujuAnswer;
+    try {
+      // A saudação inicial é local; a conversa enviada começa na primeira pergunta
+      const history = conversation.slice(1).map((m) => ({ role: m.from === "user" ? "user" : "assistant", content: m.text }));
+      reply = await jujuApi<JujuAnswer>({ messages: history, facts: buildJujuFacts(ctx) });
+    } catch (error) {
+      // Sem IA (sem chave, fora do ar), a Juju volta para as respostas prontas
+      console.warn("Juju: usando respostas prontas", error);
+      reply = answer(text, ctx);
+    }
+    setMessages((m) => [...m, { from: "juju", id: nextId.current++, ...reply }]);
+    setTyping(false);
   }
 
   return (

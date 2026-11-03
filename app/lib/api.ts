@@ -27,7 +27,7 @@ function sessionExpired(): never {
   throw new ApiError(401, "Sua sessão expirou. Entre novamente.");
 }
 
-export async function request<T>(baseUrl: string | undefined, method: string, path: string, body?: unknown): Promise<T> {
+export async function request<T>(baseUrl: string | undefined, method: string, path: string, body?: unknown, timeoutMs = 15000): Promise<T> {
   if (!baseUrl?.trim()) throw new ApiError(503, "A URL deste serviço não foi configurada.");
   let token: string | undefined;
   try {
@@ -46,7 +46,7 @@ export async function request<T>(baseUrl: string | undefined, method: string, pa
         ...(body === undefined ? {} : { "Content-Type": "application/json" }),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(timeoutMs),
       cache: "no-store",
       credentials: "omit",
     });
@@ -74,3 +74,6 @@ export const recommendationsApi = <T>(method: string, path: string, body?: unkno
   request<T>(RECOMMENDATIONS_API_URL, method, path, body);
 export const portfolioApi = <T>(method: string, path: string, body?: unknown) =>
   request<T>(PORTFOLIO_API_URL, method, path, body);
+/** A Juju com IA roda no próprio servidor do frontend; a resposta do modelo pode levar mais tempo. */
+export const jujuApi = <T>(body: unknown) =>
+  request<T>(typeof window === "undefined" ? undefined : window.location.origin, "POST", "/api/juju", body, 40000);

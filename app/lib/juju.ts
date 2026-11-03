@@ -1,6 +1,5 @@
-// Juju (de "juros"), a assistente do Crescit. Nesta versão é uma PRÉVIA: as respostas são
-// regras prontas (por palavras-chave) que usam os dados da carteira. A ideia
-// futura é trocar `answer` por uma IA que recebe o mesmo contexto.
+// Juju (de "juros"), a assistente do Crescit. As respostas vêm da IA (juju-ai.server.ts);
+// estas regras prontas (por palavras-chave) respondem quando a IA não está disponível.
 
 import { compareAllocation, monthlyHistory, monthLabel, portfolioAlerts, suggestContribution, TARGET_ALLOCATION } from "./analysis";
 import { taxedEquivalentCdiPercent } from "./fixed-income";
