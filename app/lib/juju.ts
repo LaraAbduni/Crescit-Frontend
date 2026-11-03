@@ -6,6 +6,7 @@ import { compareAllocation, monthlyHistory, monthLabel, portfolioAlerts, suggest
 import { taxedEquivalentCdiPercent } from "./fixed-income";
 import { money, pct, qty } from "./format";
 import { goalRate, monthlyNeeded, monthsUntil, type Goal } from "./goals";
+import type { AlertStatus } from "./price-alerts";
 import { marketRates, ratePct } from "./market-rates";
 import { displayName, type PortfolioSummary } from "./portfolio";
 import { INVESTOR_TYPES, type InvestorType } from "./profile";
@@ -20,6 +21,8 @@ export interface JujuContext {
   goal: number;
   /** Objetivos da página Metas */
   goals?: Goal[];
+  /** Avisos de preço com a situação de cada um */
+  priceAlerts?: AlertStatus[];
   /** yyyy-mm-dd */
   today: string;
 }
@@ -50,6 +53,7 @@ interface Topic {
 const TOPICS: Topic[] = [
   { match: /\b(oi|ola|bom dia|boa tarde|boa noite|e ai)\b/, reply: () => ({ text: greeting() }) },
   { match: /\b(lci|lca)\b.*\b(cdb)\b|\b(cdb)\b.*\b(lci|lca)\b|isent|imposto|\bir\b/, reply: () => lciVersusCdb() },
+  { match: /aviso|lembrete|vender|lista de compra|quando (cair|subir)/, reply: (ctx) => priceAlertsOverview(ctx) },
   { match: /objetiv|sonho|viagem|casa|apartamento|carro|chegar la/, reply: (ctx) => goalsOverview(ctx) },
   { match: /aport|quanto (devo |posso )?(investir|colocar)|este mes|esse mes|meta/, reply: (ctx) => monthlyContribution(ctx) },
   { match: /atenc|alerta|risco|preocup|venc|fgc/, reply: (ctx) => attention(ctx) },
@@ -145,6 +149,25 @@ function goalsOverview({ goals = [], investorType, today, goal }: JujuContext): 
       `Seus objetivos: ${joinPt(parts)}. No total, cerca de ${money(Math.ceil(total))} por mês` +
       (total <= goal ? `, e sua meta de ${money(goal)} dá conta.` : `, acima da sua meta de ${money(goal)}. Vale aumentar a meta ou estender algum prazo.`),
     links: [{ to: "/metas", label: "Ver metas" }],
+  };
+}
+
+function priceAlertsOverview({ priceAlerts = [] }: JujuContext): JujuAnswer {
+  if (priceAlerts.length === 0) {
+    return {
+      text: "Você não tem avisos de preço. Dá para pedir um lembrete para vender quando um ativo seu subir, ou para comprar quando um ativo que você quer cair.",
+      links: [{ to: "/avisos", label: "Criar um aviso" }],
+    };
+  }
+  const fired = priceAlerts.filter((s) => s.triggered);
+  const firedText = fired.map((s) => `${s.alert.ticker} ${s.alert.direction === "sell-up" ? "subiu" : "caiu"} ${pct(Math.abs(s.change ?? 0))}`);
+  return {
+    text:
+      `Você tem ${priceAlerts.length} ${priceAlerts.length === 1 ? "aviso" : "avisos"} de preço.` +
+      (fired.length > 0
+        ? ` ${fired.length === 1 ? "Um disparou" : `${fired.length} dispararam`}: ${joinPt(firedText)}. Vale olhar com calma antes de decidir.`
+        : " Nenhum disparou ainda; eu aviso quando o preço chegar lá."),
+    links: [{ to: "/avisos", label: "Ver avisos" }],
   };
 }
 

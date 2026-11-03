@@ -5,9 +5,10 @@ import { EvolutionChart } from "~/components/evolution-chart";
 import { InstitutionBars } from "~/components/institution-bars";
 import { Trend } from "~/components/trend";
 import { monthlyHistory, monthLabel, portfolioAlerts, suggestContribution } from "~/lib/analysis";
-import { money, todayISO } from "~/lib/format";
+import { money, signedPct, todayISO } from "~/lib/format";
 import { useOnboarding } from "~/lib/onboarding";
 import type { PortfolioSummary } from "~/lib/portfolio";
+import { usePriceAlerts, type AlertStatus } from "~/lib/price-alerts";
 import { INVESTOR_TYPES, type InvestorType } from "~/lib/profile";
 import { ASSET_TYPE_LABEL } from "~/lib/recommendations";
 import { useMonthlyGoal } from "~/lib/use-monthly-goal";
@@ -33,6 +34,7 @@ export default function Home() {
   const { userId, investorType } = profile!;
   const { load, retry } = usePortfolio(userId);
   const [goal] = useMonthlyGoal(userId);
+  const { triggered } = usePriceAlerts(userId);
 
   const pill = PROFILE_PILL[investorType];
   const firstName = account?.name.split(" ")[0];
@@ -95,7 +97,7 @@ export default function Home() {
             )}
           </section>
 
-          <NextStep summary={summary} investorType={investorType} goal={goal} />
+          <NextStep summary={summary} investorType={investorType} goal={goal} triggered={triggered} />
 
           <Card
             title="Por instituição"
@@ -145,7 +147,17 @@ function HomeSkeleton() {
  * A coisa mais útil a fazer agora: começar (carteira vazia), resolver um
  * alerta importante ou fazer o aporte do mês.
  */
-function NextStep({ summary, investorType, goal }: { summary: PortfolioSummary; investorType: InvestorType; goal: number }) {
+function NextStep({
+  summary,
+  investorType,
+  goal,
+  triggered,
+}: {
+  summary: PortfolioSummary;
+  investorType: InvestorType;
+  goal: number;
+  triggered: AlertStatus[];
+}) {
   const today = todayISO();
 
   if (summary.holdings.length === 0) {
@@ -156,6 +168,27 @@ function NextStep({ summary, investorType, goal }: { summary: PortfolioSummary; 
         links={[
           { to: "/primeiros-passos", label: "Ver primeiros passos" },
           { to: "/carteira", label: "Cadastrar investimentos" },
+        ]}
+      />
+    );
+  }
+
+  // Aviso de preço que a própria pessoa pediu vem antes dos alertas automáticos
+  const fired = triggered[0];
+  if (fired && fired.change !== undefined) {
+    const sell = fired.alert.direction === "sell-up";
+    const more = triggered.length > 1 ? ` Você tem ${triggered.length} avisos disparados.` : "";
+    return (
+      <NextStepCard
+        title={`${fired.alert.ticker} ${sell ? "subiu" : "caiu"} ${signedPct(fired.change)}`}
+        text={
+          (sell
+            ? `Seu lembrete de venda disparou: o preço passou de ${money(fired.triggerPrice)}. Pode ser hora de realizar parte do lucro.`
+            : `Seu aviso de compra disparou: o preço ficou abaixo de ${money(fired.triggerPrice)}.`) + more
+        }
+        links={[
+          { to: "/avisos", label: "Ver avisos" },
+          sell ? { to: "/carteira", label: "Ver carteira" } : { to: `/recomendacoes?ativo=${encodeURIComponent(fired.alert.ticker)}`, label: "Ver ativo" },
         ]}
       />
     );

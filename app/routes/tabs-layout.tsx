@@ -3,6 +3,7 @@ import { useAuth0 } from "@auth0/auth0-react";
 import { useState } from "react";
 import { JujuLauncher } from "~/components/juju";
 import { useOnboarding } from "~/lib/onboarding";
+import { usePriceAlerts } from "~/lib/price-alerts";
 
 const TABS = [
   { to: "/inicio", label: "Início", short: "Início", icon: HomeIcon },
@@ -17,6 +18,8 @@ export default function TabsLayout() {
   const { account, profile, ready, clearDraft, retry } = useOnboarding();
   const { logout } = useAuth0();
   const [logoutError, setLogoutError] = useState(false);
+  // Avisos de preço disparados: contador no sino
+  const { triggered } = usePriceAlerts(profile?.userId ?? "");
 
   if (!ready) return null;
   if (!profile) return <Navigate to="/cadastro/contexto" replace />;
@@ -58,6 +61,25 @@ export default function TabsLayout() {
             ))}
           </ul>
         </nav>
+        <NavLink
+          to="/avisos"
+          title={triggered.length > 0 ? `Avisos (${triggered.length} disparados)` : "Avisos"}
+          className="group mt-2 flex w-[72px] flex-col items-center gap-1 rounded-2xl py-1.5"
+        >
+          {({ isActive }) => (
+            <>
+              <span
+                className={`relative grid h-9 w-12 place-items-center rounded-full transition ${
+                  isActive ? "bg-brand text-white" : "text-muted group-hover:bg-cream group-hover:text-ink"
+                }`}
+              >
+                <BellIcon size={22} />
+                <AlertBadge count={triggered.length} />
+              </span>
+              <span className={`text-[0.72rem] leading-tight ${isActive ? "font-semibold text-brand" : "text-muted group-hover:text-ink"}`}>Avisos</span>
+            </>
+          )}
+        </NavLink>
         <div className="mt-auto flex flex-col items-center gap-3">
           <span
             className="grid size-10 place-items-center rounded-full bg-brand-soft font-semibold text-brand"
@@ -82,7 +104,17 @@ export default function TabsLayout() {
         <div className="mx-auto w-full max-w-md px-6 pt-12 pb-32 md:max-w-3xl lg:max-w-[1360px] lg:px-10 lg:pt-10 lg:pb-28 xl:px-12">
           <div className="mb-6 flex items-center justify-between gap-4 text-sm text-muted lg:hidden">
             <span className="truncate">{userLabel}</span>
-            <button type="button" className="shrink-0 font-semibold text-brand hover:underline" onClick={handleLogout}>Sair</button>
+            <span className="flex shrink-0 items-center gap-4">
+              <NavLink
+                to="/avisos"
+                aria-label={triggered.length > 0 ? `Avisos, ${triggered.length} disparados` : "Avisos"}
+                className="relative grid size-10 place-items-center rounded-full border border-line bg-white text-ink"
+              >
+                <BellIcon size={20} />
+                <AlertBadge count={triggered.length} />
+              </NavLink>
+              <button type="button" className="font-semibold text-brand hover:underline" onClick={handleLogout}>Sair</button>
+            </span>
           </div>
           {logoutError && <p role="alert" className="mb-4 text-aggressive">Não foi possível sair. Tente novamente.</p>}
           <Outlet />
@@ -173,5 +205,23 @@ function TargetIcon({ size = 28 }: { size?: number }) {
       <circle cx="12" cy="12" r="4.5" />
       <circle cx="12" cy="12" r="0.8" fill="currentColor" />
     </svg>
+  );
+}
+
+function BellIcon({ size = 28 }: { size?: number }) {
+  return (
+    <svg {...iconProps} width={size} height={size}>
+      <path d="M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.5 1.5H5z" />
+      <path d="M10 20.5a2 2 0 0 0 4 0" />
+    </svg>
+  );
+}
+
+function AlertBadge({ count }: { count: number }) {
+  if (count === 0) return null;
+  return (
+    <span className="absolute -top-1 -right-1 grid h-5 min-w-5 place-items-center rounded-full bg-aggressive px-1 text-[0.7rem] font-bold text-white" aria-hidden>
+      {count}
+    </span>
   );
 }

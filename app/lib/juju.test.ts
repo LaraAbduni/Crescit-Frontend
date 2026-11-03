@@ -70,6 +70,20 @@ describe("Juju (prévia com respostas prontas)", () => {
     expect(answer("meus objetivos", ctx).links?.[0].to).toBe("/metas");
   });
 
+  it("resume os avisos de preço e destaca os disparados", async () => {
+    const { evaluateAlert } = await import("./price-alerts");
+    const base = { assetName: "x", assetType: "ETF" as const, createdAt: "2026-10-03" };
+    const priceAlerts = [
+      evaluateAlert({ ...base, id: "1", ticker: "BOVA11", direction: "sell-up", percent: 0.05, basePrice: 100 }, 106),
+      evaluateAlert({ ...base, id: "2", ticker: "IVVB11", direction: "buy-down", percent: 0.08, basePrice: 100 }, 99),
+    ];
+    const { text, links } = answer("meus avisos", { ...ctx, priceAlerts });
+    expect(text).toContain("2 avisos");
+    expect(text).toContain("BOVA11 subiu 6,0%");
+    expect(links?.[0].to).toBe("/avisos");
+    expect(answer("lembrete de venda", ctx).text).toContain("não tem avisos");
+  });
+
   it("tem uma resposta para cada pergunta sugerida e um fallback honesto", () => {
     for (const q of SUGGESTED_QUESTIONS) expect(answer(q, ctx).text).not.toContain("Ainda não sei");
     expect(answer("qual o melhor time de futebol?", ctx).text).toContain("Ainda não sei");

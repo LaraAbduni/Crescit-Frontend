@@ -52,6 +52,8 @@ describe("modo demonstração", () => {
     expect(goals).toHaveLength(3);
     expect(goals[1]).toMatchObject({ name: "Viagem para a Europa", target: 25000 });
     expect(goals[1].deadline).toMatch(/^\d{4}-\d{2}$/);
+    const alerts = JSON.parse(localStorage.getItem("crescit:avisos:user-1")!);
+    expect(alerts.map((a: { ticker: string }) => a.ticker)).toEqual(["BOVA11", "HGLG11", "WEGE3", "IVVB11"]);
   });
 
   it("a persona iniciante fica com a carteira vazia e o plano de primeiros passos preenchido", async () => {

@@ -3,6 +3,7 @@
 
 import { planStorageKey } from "./first-steps";
 import { goalsStorageKey, type Goal } from "./goals";
+import { writeAlerts, type PriceAlert } from "./price-alerts";
 import type { RateType } from "./fixed-income";
 import type { FinancialContext } from "./onboarding";
 import {
@@ -42,6 +43,8 @@ export interface Persona {
   firstSteps?: { expenses: string; saved: string; hasAccount: boolean };
   /** Objetivos da página Metas; o prazo é em meses a partir de hoje */
   goals: (Omit<Goal, "id" | "deadline"> & { monthsAhead: number })[];
+  /** Avisos de preço (o id e a data são preenchidos na hora) */
+  priceAlerts: Omit<PriceAlert, "id" | "createdAt">[];
   investments: DemoInvestment[];
 }
 
@@ -57,6 +60,14 @@ export const PERSONAS: Record<PersonaId, Persona> = {
       { kind: "reserva", name: "Reserva de emergência", target: 15000, saved: 15000, monthsAhead: 2 },
       { kind: "viagem", name: "Viagem para a Europa", target: 25000, saved: 8000, monthsAhead: 14 },
       { kind: "casa", name: "Entrada do apartamento", target: 80000, saved: 7000, monthsAhead: 48 },
+    ],
+    priceAlerts: [
+      // Preço médio de BOVA11 nos aportes abaixo: R$ 123,80; no catálogo, R$ 131,20 (+6%): dispara
+      { ticker: "BOVA11", assetName: "iShares Ibovespa", assetType: "ETF", direction: "sell-up", percent: 0.05, basePrice: 123.8 },
+      { ticker: "HGLG11", assetName: "CSHG Logística", assetType: "FII", direction: "sell-up", percent: 0.1, basePrice: 151.3 },
+      // Criado quando WEGE3 valia R$ 43,50; no catálogo, R$ 41,20 (−5,3%): dispara
+      { ticker: "WEGE3", assetName: "WEG ON", assetType: "STOCK", direction: "buy-down", percent: 0.05, basePrice: 43.5 },
+      { ticker: "IVVB11", assetName: "iShares S&P 500", assetType: "ETF", direction: "buy-down", percent: 0.08, basePrice: 342.5 },
     ],
     investments: [
       {
@@ -138,6 +149,7 @@ export const PERSONAS: Record<PersonaId, Persona> = {
     monthlyGoal: 300,
     firstSteps: { expenses: "2500", saved: "2000", hasAccount: false },
     goals: [{ kind: "reserva", name: "Reserva de emergência", target: 15000, saved: 2000, monthsAhead: 36 }],
+    priceAlerts: [],
     investments: [],
   },
 };
@@ -216,5 +228,6 @@ export async function applyPersona(
     const goals: Goal[] = persona.goals.map(({ monthsAhead, ...g }, i) => ({ ...g, id: `demo-${i}`, deadline: monthsAheadISO(monthsAhead, today) }));
     localStorage.setItem(goalsStorageKey(userId), JSON.stringify(goals));
   } catch {}
+  writeAlerts(userId, persona.priceAlerts.map((a, i) => ({ ...a, id: `demo-${i}`, createdAt: monthsAgoISO(1, today) })));
   onProgress(1);
 }

@@ -4,6 +4,7 @@ import { Sheet } from "~/components/sheet";
 import { answer, MASCOT_NAME, SUGGESTED_QUESTIONS, type JujuAnswer } from "~/lib/juju";
 import { todayISO } from "~/lib/format";
 import { useGoals } from "~/lib/goals";
+import { usePriceAlerts } from "~/lib/price-alerts";
 import type { InvestorType } from "~/lib/profile";
 import { useMonthlyGoal } from "~/lib/use-monthly-goal";
 import { usePortfolio } from "~/lib/use-portfolio";
@@ -48,6 +49,7 @@ function JujuChat({ userId, investorType, onClose }: { userId: string; investorT
   const { load } = usePortfolio(userId);
   const [goal] = useMonthlyGoal(userId);
   const { goals } = useGoals(userId);
+  const { statuses: priceAlerts } = usePriceAlerts(userId);
   const [messages, setMessages] = useState<Message[]>(() => [{ from: "juju", id: 0, ...answer("oi", { investorType, goal, today: todayISO() }) }]);
   const [typing, setTyping] = useState(false);
   const [input, setInput] = useState("");
@@ -67,7 +69,7 @@ function JujuChat({ userId, investorType, onClose }: { userId: string; investorT
     const summary = load.status === "done" ? load.summary : undefined;
     // Uma pausa curta para a resposta não aparecer junto com a pergunta
     window.setTimeout(() => {
-      setMessages((m) => [...m, { from: "juju", id: nextId.current++, ...answer(text, { summary, investorType, goal, goals, today: todayISO() }) }]);
+      setMessages((m) => [...m, { from: "juju", id: nextId.current++, ...answer(text, { summary, investorType, goal, goals, priceAlerts, today: todayISO() }) }]);
       setTyping(false);
     }, 650);
   }
