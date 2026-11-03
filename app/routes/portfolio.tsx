@@ -6,7 +6,8 @@ import { Sheet } from "~/components/sheet";
 import { useToast } from "~/components/toast";
 import { Trend } from "~/components/trend";
 import { Chip, PageTitle } from "~/components/ui";
-import { CDI_REFERENCE, rateLabel } from "~/lib/fixed-income";
+import { rateLabel } from "~/lib/fixed-income";
+import { cdiText } from "~/lib/market-rates";
 import { dateBR, money, pct, qty } from "~/lib/format";
 import { useOnboarding } from "~/lib/onboarding";
 import {
@@ -121,7 +122,7 @@ export default function Portfolio() {
               <p className="mt-3 text-sm text-muted">Ações, FIIs e ETFs usam os preços cadastrados no catálogo, sem cotação em tempo real.</p>
               {load.summary.hasEstimates && (
                 <p className="mt-2 text-sm text-muted">
-                  Renda fixa: valor bruto estimado pela taxa contratada, com CDI de referência de {pct(CDI_REFERENCE)} ao ano.
+                  Renda fixa: valor bruto estimado pela taxa contratada, com {cdiText()}.
                 </p>
               )}
               {load.summary.hasMissingPrices && <p role="status" className="mt-2 text-sm text-muted">Para fundos e ativos sem preço ou taxa, mostramos o valor investido.</p>}

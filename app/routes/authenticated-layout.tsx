@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router";
 import { Logo, PrimaryButton, Screen, TextButton, Title } from "~/components/ui";
 import { SessionLoading } from "~/lib/auth";
+import { useMarketRates } from "~/lib/market-rates";
 import { useOnboarding } from "~/lib/onboarding";
 
 export default function AuthenticatedLayout() {
@@ -10,6 +11,8 @@ export default function AuthenticatedLayout() {
   const { ready, error, retry, clearDraft } = useOnboarding();
   const location = useLocation();
   const [logoutError, setLogoutError] = useState(false);
+  // As telas estimam a renda fixa com o CDI do dia: esperamos a busca (no máximo alguns segundos)
+  const { ready: ratesReady } = useMarketRates();
   if (!isAuthenticated) {
     return <Navigate to={`/cadastro?returnTo=${encodeURIComponent(location.pathname + location.search)}`} replace />;
   }
@@ -28,6 +31,6 @@ export default function AuthenticatedLayout() {
       </Screen>
     );
   }
-  if (!ready) return <SessionLoading />;
+  if (!ready || !ratesReady) return <SessionLoading />;
   return <Outlet />;
 }

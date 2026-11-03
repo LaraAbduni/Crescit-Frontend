@@ -14,6 +14,8 @@ export default [
       route("carteira", "routes/portfolio.tsx"),
       route("analise", "routes/analysis.tsx"),
       route("primeiros-passos", "routes/first-steps.tsx"),
+      // Fora do menu: prepara as contas da apresentação
+      route("demo", "routes/demo.tsx"),
     ]),
   ]),
 ] satisfies RouteConfig;

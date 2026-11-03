@@ -3,6 +3,9 @@
 
 import type { InvestorType } from "./profile";
 
+/** Onde ficam os gastos, a reserva e a conta informados na tela de Primeiros passos. */
+export const planStorageKey = (userId: string) => `crescit:primeiros-passos:${userId}`;
+
 /** Quantos meses de gastos a reserva de emergência deve cobrir. */
 export const RESERVE_MONTHS = 6;
 

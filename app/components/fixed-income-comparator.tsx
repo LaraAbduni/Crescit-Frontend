@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Chip, TextField } from "~/components/ui";
 import {
-  CDI_REFERENCE,
   RATE_TYPE_LABEL,
   rateLabel,
   simulate,
@@ -10,6 +9,7 @@ import {
   type RateType,
 } from "~/lib/fixed-income";
 import { money, parseDecimal, pct, qty } from "~/lib/format";
+import { marketRates, ratePct } from "~/lib/market-rates";
 import { displayName, institutionOf, type Holding } from "~/lib/portfolio";
 
 const PERIODS = [
@@ -63,8 +63,28 @@ export function FixedIncomeComparator({ holdings }: { holdings: Holding[] }) {
   // Equivalência: quanto um CDB precisa pagar para empatar com a opção isenta (% do CDI)
   const exemptCdi = options.findIndex((o) => o.exempt && o.rateType === "CDI_PERCENT" && parseDecimal(o.rateValue) > 0);
 
+  const rates = marketRates();
+
   return (
     <div>
+      <dl className="mt-4 grid grid-cols-3 gap-2 rounded-2xl bg-cream p-3 sm:max-w-lg">
+        {[
+          ["CDI", rates.cdi, "ao ano"],
+          ["Selic", rates.selic, "meta"],
+          ["IPCA", rates.ipca, "12 meses"],
+        ].map(([label, value, hint]) => (
+          <div key={label as string} className="px-1">
+            <dt className="text-sm text-muted">
+              {label} <span className="text-xs">({hint})</span>
+            </dt>
+            <dd className="font-semibold text-ink tabular-nums">{ratePct(value as number)}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-1 text-xs text-muted">
+        {rates.source === "bcb" ? `Taxas do Banco Central, atualizadas em ${rates.date}.` : "Taxas de referência (o Banco Central não respondeu)."}
+      </p>
+
       <div className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,14rem)_1fr] sm:items-end">
         <TextField label="Valor aplicado" inputMode="decimal" value={amountInput} onChange={(e) => setAmountInput(e.target.value)} />
         <fieldset>
@@ -170,8 +190,7 @@ export function FixedIncomeComparator({ holdings }: { holdings: Holding[] }) {
         </p>
       )}
       <p className="mt-3 text-sm text-muted">
-        Simulação com CDI de referência de {pct(CDI_REFERENCE)} ao ano e taxas constantes no período. Não considera IOF
-        (resgates em menos de 30 dias).
+        Simulação com as taxas acima mantidas constantes no período. Não considera IOF (resgates em menos de 30 dias).
       </p>
     </div>
   );

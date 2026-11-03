@@ -3,9 +3,10 @@ import { Link } from "react-router";
 import type { Route } from "./+types/first-steps";
 import { PageTitle, TextField } from "~/components/ui";
 import { suggestContribution } from "~/lib/analysis";
-import { projection, reservePlan, RESERVE_MONTHS, SIMULATION_RATE } from "~/lib/first-steps";
+import { planStorageKey as planKey, projection, reservePlan, RESERVE_MONTHS, SIMULATION_RATE } from "~/lib/first-steps";
 import { money, parseDecimal, pct } from "~/lib/format";
 import { INSTITUTIONS } from "~/lib/institutions";
+import { marketRates, ratePct } from "~/lib/market-rates";
 import { useOnboarding } from "~/lib/onboarding";
 import type { PortfolioSummary } from "~/lib/portfolio";
 import { INVESTOR_TYPES } from "~/lib/profile";
@@ -37,8 +38,6 @@ interface PlanInputs {
   saved: string;
   hasAccount: boolean;
 }
-
-const planKey = (userId: string) => `crescit:primeiros-passos:${userId}`;
 
 /** Gastos, reserva e conta ficam no navegador, para a pessoa não redigitar. */
 function usePlanInputs(userId: string, hasAccountFromSignup: boolean) {
@@ -153,7 +152,7 @@ export default function FirstSteps() {
           )}
           <p className="mt-4 text-sm text-muted">
             <span className="font-semibold text-ink">Onde guardar:</span> Tesouro Selic ou CDB com liquidez diária que
-            renda pelo menos 100% do CDI.
+            renda pelo menos 100% do CDI ({marketRates().source === "bcb" ? "hoje, " : ""}cerca de {ratePct(marketRates().cdi)} ao ano).
           </p>
         </Step>
 

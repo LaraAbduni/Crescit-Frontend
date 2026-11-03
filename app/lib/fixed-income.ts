@@ -1,4 +1,5 @@
 import { qty } from "./format";
+import { FALLBACK_RATES, marketRates } from "./market-rates";
 
 /** Valores do enum RateType do Serviço de Portfólio. */
 export type RateType = "CDI_PERCENT" | "PREFIXED" | "IPCA_PLUS";
@@ -9,16 +10,17 @@ export const RATE_TYPE_LABEL: Record<RateType, string> = {
   IPCA_PLUS: "IPCA +",
 };
 
-// Taxas de referência usadas só para ESTIMAR o valor atual da renda fixa.
-// Não são cotações em tempo real; a tela sempre diz que o valor é estimado.
-export const CDI_REFERENCE = 0.14;
-export const IPCA_REFERENCE = 0.045;
+// Taxas padrão, usadas até (ou se não) as do Banco Central carregarem.
+// Servem só para ESTIMAR a renda fixa; a tela sempre diz que o valor é estimado.
+export const CDI_REFERENCE = FALLBACK_RATES.cdi;
+export const IPCA_REFERENCE = FALLBACK_RATES.ipca;
 
 /** Taxa anual equivalente, como fração (0.154 = 15,4% a.a.). */
 export function annualRate(type: RateType, value: number) {
-  if (type === "CDI_PERCENT") return CDI_REFERENCE * (value / 100);
+  const { cdi, ipca } = marketRates();
+  if (type === "CDI_PERCENT") return cdi * (value / 100);
   if (type === "PREFIXED") return value / 100;
-  return (1 + IPCA_REFERENCE) * (1 + value / 100) - 1;
+  return (1 + ipca) * (1 + value / 100) - 1;
 }
 
 /** "110% do CDI", "12,5% a.a.", "IPCA + 6% a.a." */

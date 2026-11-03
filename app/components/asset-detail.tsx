@@ -2,6 +2,7 @@ import { useState } from "react";
 import { PrimaryButton, TextField } from "~/components/ui";
 import { incomeTaxRate, rateLabel, simulate } from "~/lib/fixed-income";
 import { money, parseDecimal, pct } from "~/lib/format";
+import { cdiText } from "~/lib/market-rates";
 import { unitLabel } from "~/lib/portfolio";
 import {
   ASSET_TYPE_DESCRIPTION,
@@ -133,6 +134,7 @@ function FixedIncomeSimulation({ asset, amount }: { asset: Asset; amount: number
           </li>
         ))}
       </ul>
+      {asset.rateType === "CDI_PERCENT" && <p className="mt-2 text-sm text-muted">Com {cdiText()}, mantido no período.</p>}
     </>
   );
 }
