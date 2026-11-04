@@ -76,4 +76,4 @@ export const portfolioApi = <T>(method: string, path: string, body?: unknown) =>
   request<T>(PORTFOLIO_API_URL, method, path, body);
 /** A Juju com IA roda no próprio servidor do frontend; a resposta do modelo pode levar mais tempo. */
 export const jujuApi = <T>(body: unknown) =>
-  request<T>(typeof window === "undefined" ? undefined : window.location.origin, "POST", "/api/juju", body, 40000);
+  request<T>(typeof window === "undefined" ? undefined : window.location.origin, "POST", "/api/juju", body, 50000);

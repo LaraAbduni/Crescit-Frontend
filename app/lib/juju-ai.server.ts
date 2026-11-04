@@ -100,7 +100,8 @@ export function extractLinks(raw: string): JujuAnswer {
 }
 
 export async function askJuju(messages: ChatMessage[], facts: string): Promise<JujuAnswer> {
-  const apiKey = process.env.META_API_KEY;
+  // Tira espaços, quebras de linha e aspas que costumam vir junto ao colar a chave na Vercel
+  const apiKey = process.env.META_API_KEY?.trim().replace(/^["']|["']$/g, "");
   if (!apiKey) throw new JujuError(503, "A chave da IA não foi configurada.");
   let res: Response;
   try {
@@ -111,23 +112,30 @@ export async function askJuju(messages: ChatMessage[], facts: string): Promise<J
         model: META_MODEL,
         messages: [{ role: "system", content: `${SYSTEM_PROMPT}\n\n<dados_do_usuario>\n${facts}\n</dados_do_usuario>` }, ...messages],
         temperature: 0.4,
-        max_tokens: 500,
+        // O Muse Spark raciocina antes de responder e esse raciocínio gasta tokens: um limite baixo deixa a resposta vazia
+        max_tokens: 4000,
       }),
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(45000),
     });
   } catch {
     throw new JujuError(504, "A IA demorou para responder.");
   }
   if (!res.ok) {
-    console.error("Juju: a API da Meta respondeu", res.status, await res.text().catch(() => ""));
-    throw new JujuError(502, "A IA não conseguiu responder agora.");
+    const body = await res.text().catch(() => "");
+    console.error("Juju: a API da Meta respondeu", res.status, body);
+    // O código e o começo do erro da Meta (nunca a chave) aparecem no console do navegador para facilitar o diagnóstico
+    throw new JujuError(502, `A IA não conseguiu responder agora (Meta ${res.status}: ${body.slice(0, 200)}).`);
   }
-  const data = (await res.json()) as { choices?: { message?: { content?: unknown } }[] };
+  const data = (await res.json()) as { choices?: { message?: { content?: unknown }; finish_reason?: string }[] };
   const content = data.choices?.[0]?.message?.content;
   // Algumas APIs compatíveis devolvem o conteúdo em partes
   const raw = typeof content === "string"
     ? content
     : Array.isArray(content) ? content.map((p) => (typeof p?.text === "string" ? p.text : "")).join("") : "";
-  if (!raw.trim()) throw new JujuError(502, "A IA não conseguiu responder agora.");
+  if (!raw.trim()) {
+    const reason = data.choices?.[0]?.finish_reason ?? "sem motivo";
+    console.error("Juju: a API da Meta respondeu sem texto", reason, JSON.stringify(data).slice(0, 500));
+    throw new JujuError(502, `A IA não conseguiu responder agora (resposta vazia: ${reason}).`);
+  }
   return extractLinks(raw);
 }
